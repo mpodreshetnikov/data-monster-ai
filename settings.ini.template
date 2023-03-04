@@ -1,0 +1,9 @@
+[openai]
+ApiKey =
+
+[db]
+Host =
+Database =
+User =
+Password =
+Port =
