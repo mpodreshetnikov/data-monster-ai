@@ -1,6 +1,6 @@
-import re
+import re, pandas as pd, psycopg
 
-db_conn = None
+db_conn: psycopg.Connection = None
 
 def get_db_schema_via_dump():
     # get sql from pgdump
@@ -41,8 +41,9 @@ def do_db_request(sql):
     with db_conn.cursor() as cur:
         try:
             cur.execute(sql)
-            result = cur.fetchall() if cur.rowcount else "NO DATA"
+            data = cur.fetchall() if cur.rowcount else "NO DATA"
             columns = list(map(lambda x: x.name, cur.description))
-            return (columns, result)
-        except Exception as e:
+            return pd.DataFrame(data, columns=columns)
+        except Exception:
+            db_conn.rollback()
             return "ERROR"

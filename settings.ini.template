@@ -1,5 +1,6 @@
 [openai]
 ApiKey =
+TokensLimitByMinute =
 
 [db]
 Host =
@@ -7,3 +8,6 @@ Database =
 User =
 Password =
 Port =
+
+[telegram]
+Token =
