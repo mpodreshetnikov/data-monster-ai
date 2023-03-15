@@ -1,13 +1,27 @@
 [openai]
-ApiKey =
-TokensLimitByMinute =
+ApiKey = awdawdawedawxiueynm8327x
+ChoicesOneRequest = 3
+TestMode = False
+LimitRetries = 5
+RetriesTimeoutSeconds = 30
 
 [db]
-Host =
-Database =
-User =
-Password =
-Port =
+Host = localhost
+Database = database
+User = user
+Password = password
+Port = 5432
+
+[db_scheme]
+UseWeakForeignKeys = False
+WeakForeignKeysThreshold = 0.5
 
 [telegram]
-Token =
+Token = 182736192837:akwbdnlkauwbh27y82313
+
+[corrections_db]
+Host = localhost
+Database = database
+User = postgres
+Password = postgres
+Port = 5432

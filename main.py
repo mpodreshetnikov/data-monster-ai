@@ -1,70 +1,59 @@
-import dbaccess, ai, answering, drawer
-import psycopg, configparser, os, openai.error
-from datetime import datetime
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
+import configparser, logging
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
+import tg_bot.tg_main as tg_main
+from tg_bot.correction import add_correction_handler
+import json_fixer
 
-async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE, debug=False):
-    chat_id = update.effective_chat.id
+json_fixer.fix_serialiazing()
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s | %(message)s",
+    level=logging.INFO,
+    filename="log.txt"
+)
+logger = logging.getLogger(__name__)
 
-    await context.bot.send_message(chat_id, text="Собираю данные...")
-    question = " ".join(context.args) if context.args else update.message.text
-    try:
-        answer = answering.answer(question)
-    except openai.error.RateLimitError as e:
-        await context.bot.send_message(chat_id, text=f"Превышен лимит запросов, попробуйте позже")
-        if debug: await context.bot.send_message(chat_id, text=e.user_message)
-        return
-    except Exception as e:
-        await context.bot.send_message(chat_id, text="Неизвестная ошибка, попробуйте еще раз")
-        if debug: await context.bot.send_message(chat_id, text=str(e))
-        return
-
-    if debug: await context.bot.send_message(chat_id, text=str(answer[1]))
-    match answer[2]:
-        case answering.AnswerType.ERROR:
-            await context.bot.send_message(chat_id, text="Ошибка сбора данных, попробуйте изменить запрос")
-            return
-        case answering.AnswerType.NUMBER:
-            await context.bot.send_message(chat_id, text=str(answer[0].iat[0, 0]))
-        case answering.AnswerType.TABLE:
-            filename = f"{datetime.now().strftime('%d_%m_%Y_%H_%M_%S')}_{question.replace(' ', '_')}_{update.effective_user.id}.png"
-            drawer.draw_table(answer[0], filename)
-            try:
-                await context.bot.send_photo(chat_id, photo=filename)
-            finally:
-                os.remove(filename)
-    
-    await context.bot.send_message(chat_id, text="Что еще хочешь узнать?")
-    
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Привет! Что хочешь узнать?")
 
 if __name__ == '__main__':
     # configure
     config = configparser.ConfigParser()
     config.read("settings.ini")
-
-    ai.set_openai_api_key(config["openai"]["ApiKey"])
-    dbaccess.db_conn = psycopg.connect(
-        host = config["db"]["Host"],
-        dbname = config["db"]["Database"],
-        user = config["db"]["User"],
-        password = config["db"]["Password"],
-        port = config["db"]["Port"]
-    )
     
     application = ApplicationBuilder().token(config["telegram"]["Token"]).concurrent_updates(True).build()
 
-    application.add_handler(CommandHandler('start', start))
-    application.add_handler(CommandHandler('debug', lambda update, context: answer(update, context, debug=True)))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, answer))
+    application.add_handler(CommandHandler('start', tg_main.start))
 
+    # handlers, required order
+    add_correction_handler(application)
+    application.add_handler(CommandHandler('debug', lambda update, context: tg_main.answer_question(update, context, debug=True)))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, tg_main.answer_question))
+
+    application.add_error_handler(lambda _, context: logger.error(context.error, exc_info=True))
+
+    logger.info("Start application")
     application.run_polling()
 
 
+# Делать умные ретраи - увеличивать колво ответов до 3 или менять температуру
+# Создание промта с помощью библиотеки microsoft https://github.com/microsoft/prompt-engine-py
+# Запустить ПО на дев базе школьной карты и потестировать / пописать корректирующие запросы
+# Пробовать подбирать температуру с помощью ИИ
+# генерация текстовых подсказок в виде плана ответа
+# transcribe question from audio
+# graph/plot requests
+# скачивание эксель файла с таблицей при необходимости
+# добавлять в запрос контекст предыдущего ответа, чтобы можно быдо доспросить (как в chatGPT)
+# data request suggestions
+# challenge: save correctness of corrections due database tables refactoring
+# challenge: data aggregation from different sources (2 DBs for example)
 
-# добавить внешние ключи
-# graphic requests
-# скачивание эксель файла при необходимости
+# как улучшал качество
+# было 5% шанс корректного запроса
+# 1) поставил температуру 0.05 и запрос 3-х ответов сразу с попыткой запустить в бд хотя бы один
+# стало: 10% шанс корректного запроса, но в бесплатной версии часто вылетает ошибка о загруженности модели
+# 2) улучшил качество нейминга таблиц (соотв смыслу и грамотность)
+# 3) почистил слабые нейминги колонок таблиц по схожести между внешними ключами similarity(column_name, confrelid::regclass::text) FROM pg_constraint
+# стало: без изменений
+# 4) поставил температуру 0.1, тк иногда все 3 запроса одинаковые
+# стало: хуже, запросы стали слишком выдуманными без соответствия схеме, вернул на 0.05
+# 5) добавил возможность корректировать ответы бота и тем самым дообучать (через примеры в prompt)
+# сильно возросло качество ответов бота при внесении хотя бы одной корректировке на схожие связи таблиц (% сложно подсчитать ~80%)
