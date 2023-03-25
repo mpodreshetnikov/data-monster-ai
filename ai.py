@@ -6,11 +6,14 @@ config = configparser.ConfigParser()
 config.read("settings.ini")
 
 openai.api_key = config["openai"]["ApiKey"]
+MaxAnswerTokens: int = int(config["openai"]["MaxAnswerTokens"])
 ChoicesOneRequest: int = int(config["openai"]["ChoicesOneRequest"])
 TestMode: bool = config.getboolean("openai", "TestMode")
+RequestTimeoutSeconds: int = int(config["openai"]["RequestTimeoutSeconds"])
 LimitRetries: int = int(config["openai"]["LimitRetries"])
 RetriesTimeoutSeconds: int = int(config["openai"]["RetriesTimeoutSeconds"])
-
+AiModel: str = config["openai"]["AiModel"]
+AiModelType: str = config["openai"]["AiModelType"]
 
 logger = logging.getLogger(__name__)
 
@@ -24,39 +27,69 @@ class TryAiLaterException(Exception):
         super().__init__(*args)
 
 
-def get_ai_responses(prompt: str) -> list[str]:
-    global ChoicesOneRequest, TestMode
+def list_ai_models() -> list[str]:
+    models = openai.Model.list()
+    models_names = list(map(lambda x: x.openai_id, models.data))
+    return models_names
+logger.info(list_ai_models())
+
+
+def get_ai_responses(prompt: str, stop_sequence: list[str] = None) -> list[str]:
+    global ChoicesOneRequest, TestMode, RequestTimeoutSeconds, AiModel, AiModelType, MaxAnswerTokens
 
     if TestMode:
         logger.info("Returned Test Mode default answer")
-        return ["* from"]
+        return ["* FROM pg_catalog.pg_namespace"]
+
+    if stop_sequence is None: stop_sequence = ["#", ";"]
 
     logger.info("Asking AI...")
-    response = openai.Completion.create(
-        model="code-davinci-002",
-        prompt=prompt,
-        temperature=0.05,
-        max_tokens=1000,
-        top_p=1,
-        frequency_penalty=0,
-        presence_penalty=0,
-        stop=["#", ";"],
-        n=ChoicesOneRequest,
-    )
+    
+    temperature = 0.05
 
-    str_ai_answers = ', '.join(map(lambda x: f'[{x.finish_reason}]', response.choices))
-    logger.info(f"AI {response.model}/{response.response_ms}ms. Tokens: {response.usage.prompt_tokens}prompt, {response.usage.completion_tokens}completion. Answers-metadata: {str_ai_answers}")
-    logger.info(list(map(lambda x: x.text, response.choices)))
+    if AiModelType == "completion":
+        response = openai.Completion.create(
+            model=AiModel,
+            prompt=prompt,
+            temperature=temperature,
+            max_tokens=MaxAnswerTokens,
+            stop=stop_sequence,
+            n=ChoicesOneRequest,
+            request_timeout=RequestTimeoutSeconds,
+        )
+    elif AiModelType == "chat":
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                    {"role": "system", "content": "You are a helpful assystant for code and data analysis. You help to write SQL and Python code. You can also show data in tables and plots."},
+                    {"role": "user", "content": prompt}
+                ],
+            temperature=temperature,
+            max_tokens=MaxAnswerTokens,
+            n=ChoicesOneRequest,
+            request_timeout=RequestTimeoutSeconds,
+        )
+    if not response: raise Exception("AI model type is not supported")
 
-    possible_answers = list(map(lambda x: x.text, filter(lambda x: x.finish_reason == "stop", response.choices)))
-    logger.info(f"There are {len(possible_answers)} correct answers")
+    str_ai_answers_reasons = ', '.join(map(lambda x: f'[{x.finish_reason}]', response.choices))
+    logger.info(f"AI {response.model}/{response.response_ms}ms. Tokens: {response.usage.prompt_tokens}prompt, {response.usage.completion_tokens}completion. Answers-metadata: {str_ai_answers_reasons}")
 
-    if len(possible_answers) == 0:
+    possible_answers = filter(lambda x: x.finish_reason == "stop", response.choices)
+    if AiModelType == "completion":
+        logger.info(list(map(lambda x: x.text, response.choices)))
+        answers_text = list(map(lambda x: x.text, possible_answers))
+    elif AiModelType == "chat":
+        logger.info(list(map(lambda x: x.message.content, response.choices)))
+        answers_text = list(map(lambda x: x.message.content, possible_answers))
+
+    logger.info(f"There are {len(answers_text)} correct answers")
+
+    if len(answers_text) == 0:
         raise NotCorrectAiAnswerException("AI answer was long or infinite. Try to increase 'max_tokens' or change the prompt.")
-    return possible_answers
+    return answers_text
 
 
-def get_ai_responses_with_retries(prompt: str, retries_limit: int, retries_timeout_seconds: int) -> list[str]:
+def get_ai_responses_with_retries(retries_limit: int, retries_timeout_seconds: int, prompt: str, stop_sequence: list[str] = None) -> list[str]:
     logger.info(f"Asking AI with {retries_limit} retries and {retries_timeout_seconds}s timeout")
     for retry in range(retries_limit):
         try:
@@ -64,7 +97,7 @@ def get_ai_responses_with_retries(prompt: str, retries_limit: int, retries_timeo
                 logger.info('Waiting timeout...')
                 time.sleep(retries_timeout_seconds)
             logger.info(f'Trying {retry + 1}...')
-            return get_ai_responses(prompt)
+            return get_ai_responses(prompt, stop_sequence)
         except (
             openai.error.RateLimitError,
             openai.error.Timeout,
@@ -83,7 +116,6 @@ def get_ai_responses_with_retries(prompt: str, retries_limit: int, retries_timeo
     raise TryAiLaterException(f"Cannot get an answer: {retries_limit} retries with {retries_timeout_seconds}s sleep between. Try again later.")
 
 
-def generate_answer_code(prompt: str) -> list[str]:
+def generate_answer_code(prompt: str, stop_sequence: list[str] = None) -> list[str]:
     global LimitRetries, RetriesTimeoutSeconds
-    ai_responses = get_ai_responses_with_retries(prompt, LimitRetries, RetriesTimeoutSeconds)
-    return list(map(lambda x: f"SELECT {x}", ai_responses))
+    return list(map(str.rstrip, get_ai_responses_with_retries(LimitRetries, RetriesTimeoutSeconds, prompt, stop_sequence)))

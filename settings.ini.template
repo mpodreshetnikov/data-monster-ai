@@ -1,9 +1,13 @@
 [openai]
 ApiKey = awdawdawedawxiueynm8327x
 ChoicesOneRequest = 3
+MaxAnswerTokens = 300
 TestMode = False
+RequestTimeoutSeconds = 300 
 LimitRetries = 5
 RetriesTimeoutSeconds = 30
+AiModel = gpt-3.5-turbo
+AiModelType = chat
 
 [db]
 Host = localhost
@@ -25,3 +29,9 @@ Database = database
 User = postgres
 Password = postgres
 Port = 5432
+
+[corrections]
+Limit = 2
+
+[drawing]
+TestMode = False

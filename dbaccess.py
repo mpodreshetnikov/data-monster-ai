@@ -1,4 +1,4 @@
-from my_types import Answer, AnswerType
+from my_types import Interaction, AnswerType
 import pandas as pd, psycopg
 import configparser
 
@@ -74,16 +74,18 @@ class DbAccess():
         return schema
 
 
-    def try_db_requests(self, sql_requests: list[str]) -> Answer:
+    def try_set_answer_with_db_requests(self, interaction: Interaction, sql_requests: list[str]):
         for sql in sql_requests:
             with self.db_conn.cursor() as cur:
                 try:
                     cur.execute(sql)
                     if not cur.rowcount:
-                        return Answer(None, answer_code=sql, type=AnswerType.NO_DATA)
+                        interaction.set_answer(None, answer_code=sql, type=AnswerType.NO_DATA)
+                        return interaction
                     data = cur.fetchall()
                     columns = list(map(lambda x: x.name, cur.description))
-                    return Answer(pd.DataFrame(data, columns=columns), answer_code=sql)
+                    interaction.set_answer(pd.DataFrame(data, columns=columns), answer_code=sql)
+                    return interaction
                 except Exception:
                     self.db_conn.rollback()
         raise NoValidSqlException("No valid SQLs", sql_requests)
