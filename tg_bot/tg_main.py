@@ -1,6 +1,6 @@
 from typing import Callable
 from my_types import Interaction, AnswerType, ButtonMenuActions
-import answering.answering as answering, answering.drawer as drawer, dbaccess, ai
+import answering.answering as answering, answering.drawer as drawer, db.dbaccess as dbaccess, ai
 import os, logging
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup

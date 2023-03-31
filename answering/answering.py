@@ -1,7 +1,7 @@
 import configparser
 from my_types import Interaction, AnswerType
 import answering.prompts as prompts, ai
-from dbaccess import DbAccess
+from db.dbaccess import DbAccess
 from tg_bot.correction import CorrectionDbAccess
 import logging, json
 from pandas import DataFrame
@@ -21,7 +21,7 @@ def answer(interaction: Interaction) -> Interaction:
     global CorrectionsLimit
 
     dbaccess = DbAccess("db")
-    db_schema = dbaccess.get_db_schema_via_sql()
+    db_schema = dbaccess.get_db_schema()
 
     corr_dbaccess = CorrectionDbAccess("corrections_db")
     examples = corr_dbaccess.get_good_corrections(interaction.question, CorrectionsLimit)

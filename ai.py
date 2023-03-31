@@ -14,6 +14,7 @@ LimitRetries: int = int(config["openai"]["LimitRetries"])
 RetriesTimeoutSeconds: int = int(config["openai"]["RetriesTimeoutSeconds"])
 AiModel: str = config["openai"]["AiModel"]
 AiModelType: str = config["openai"]["AiModelType"]
+AiEmbeddingModel: str = config["openai"]["EmbeddingModel"]
 
 logger = logging.getLogger(__name__)
 
@@ -27,14 +28,34 @@ class TryAiLaterException(Exception):
         super().__init__(*args)
 
 
-def list_ai_models() -> list[str]:
+def generate_answer_code(prompt: str, stop_sequence: list[str] = None) -> list[str]:
+    global LimitRetries, RetriesTimeoutSeconds
+    return list(map(str.rstrip,
+                    __get_ai_responses_with_retries__(
+                        lambda _: __get_ai_responses__(prompt, stop_sequence))))
+
+
+def get_embedding(prompt: str | list[str]) -> list[float] | list[list[float]]:
+    global RequestTimeoutSeconds, AiModel
+    response = openai.Embedding.create(
+        model=AiEmbeddingModel,
+        input=prompt,
+    )
+    data = response.data
+    if len(data) == 1:
+        return data[0].embedding
+    else:
+        return list(map(lambda x: x.embedding, data))
+
+
+def __list_ai_models__() -> list[str]:
     models = openai.Model.list()
     models_names = list(map(lambda x: x.openai_id, models.data))
     return models_names
-logger.info(list_ai_models())
+logger.info(__list_ai_models__())
 
 
-def get_ai_responses(prompt: str, stop_sequence: list[str] = None) -> list[str]:
+def __get_ai_responses__(prompt: str, stop_sequence: list[str] = None) -> list[str]:
     global ChoicesOneRequest, TestMode, RequestTimeoutSeconds, AiModel, AiModelType, MaxAnswerTokens
 
     if TestMode:
@@ -89,7 +110,14 @@ def get_ai_responses(prompt: str, stop_sequence: list[str] = None) -> list[str]:
     return answers_text
 
 
-def get_ai_responses_with_retries(retries_limit: int, retries_timeout_seconds: int, prompt: str, stop_sequence: list[str] = None) -> list[str]:
+def __get_ai_responses_with_retries__(
+        call: callable,
+        retries_limit: int = None,
+        retries_timeout_seconds: int = None
+        ) -> any:
+    retries_limit = retries_limit or LimitRetries
+    retries_timeout_seconds = retries_timeout_seconds or RetriesTimeoutSeconds
+    
     logger.info(f"Asking AI with {retries_limit} retries and {retries_timeout_seconds}s timeout")
     for retry in range(retries_limit):
         try:
@@ -97,7 +125,7 @@ def get_ai_responses_with_retries(retries_limit: int, retries_timeout_seconds: i
                 logger.info('Waiting timeout...')
                 time.sleep(retries_timeout_seconds)
             logger.info(f'Trying {retry + 1}...')
-            return get_ai_responses(prompt, stop_sequence)
+            return call()
         except (
             openai.error.RateLimitError,
             openai.error.Timeout,
@@ -114,8 +142,3 @@ def get_ai_responses_with_retries(retries_limit: int, retries_timeout_seconds: i
                 continue
             else: raise e
     raise TryAiLaterException(f"Cannot get an answer: {retries_limit} retries with {retries_timeout_seconds}s sleep between. Try again later.")
-
-
-def generate_answer_code(prompt: str, stop_sequence: list[str] = None) -> list[str]:
-    global LimitRetries, RetriesTimeoutSeconds
-    return list(map(str.rstrip, get_ai_responses_with_retries(LimitRetries, RetriesTimeoutSeconds, prompt, stop_sequence)))

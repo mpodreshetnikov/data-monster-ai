@@ -1,7 +1,7 @@
 from enum import Enum
 from telegram import constants, Update
 from telegram.ext import ContextTypes, Application, ConversationHandler, CallbackQueryHandler, MessageHandler, filters
-from dbaccess import DbAccess
+from db.dbaccess import DbAccess
 from my_types import ButtonMenuActions
 import logging, json
 

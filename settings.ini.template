@@ -8,6 +8,7 @@ LimitRetries = 5
 RetriesTimeoutSeconds = 30
 AiModel = gpt-3.5-turbo
 AiModelType = chat
+EmbeddingModel = text-embedding-ada-002
 
 [db]
 Host = localhost

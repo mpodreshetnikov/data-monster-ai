@@ -8,7 +8,8 @@ json_fixer.fix_serialiazing()
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s | %(message)s",
     level=logging.INFO,
-    filename="log.txt"
+    filename="log.txt",
+    force=True,
 )
 logger = logging.getLogger(__name__)
 
