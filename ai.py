@@ -32,7 +32,7 @@ def generate_answer_code(prompt: str, stop_sequence: list[str] = None) -> list[s
     global LimitRetries, RetriesTimeoutSeconds
     return list(map(str.rstrip,
                     __get_ai_responses_with_retries__(
-                        lambda _: __get_ai_responses__(prompt, stop_sequence))))
+                        lambda: __get_ai_responses__(prompt, stop_sequence))))
 
 
 def get_embedding(prompt: str | list[str]) -> list[float] | list[list[float]]:

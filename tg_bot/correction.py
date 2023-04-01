@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS corrections (
         logger.info(f"Added correction for question: {correction.question}")
 
     
-    def get_good_corrections(self, question: str, limit: int) -> list[str]:
+    def get_good_corrections(self, question: str, limit: int) -> list[Correction]:
         with self.db_conn.cursor() as cur:
             cur.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
             cur.execute("""

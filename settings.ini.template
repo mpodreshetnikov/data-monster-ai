@@ -18,6 +18,7 @@ Password = password
 Port = 5432
 
 [db_scheme]
+TablesToTake = 20
 UseWeakForeignKeys = False
 WeakForeignKeysThreshold = 0.5
 

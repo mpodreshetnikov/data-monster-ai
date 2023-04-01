@@ -1,8 +1,61 @@
 from tg_bot.correction import Correction
 from my_types import Interaction
-import configparser
-from llama_index import download_loader
 
+TEXT_TO_SQL_TMPL = (
+    "Given an input question, create a single syntactically correct {dialect} query to run. "
+    "You can order the results by a relevant column to return the most "
+    "interesting examples in the database.\n"
+    "Never query for all the columns from a specific table, only ask for a the "
+    "few relevant columns given the question.\n"
+    "Pay attention to use only the column names that you can see in the schema "
+    "description. "
+    "Be careful to not query for columns that do not exist. "
+    "Pay attention to which column is in which table. "
+    "Also, qualify column names with the table name when needed.\n\n"
+    "Use the following format:\n"
+    "Question: Question here\n"
+    "SQLQuery: SQL Query to run\n\n"
+    "Only use the tables listed below.\n\n"
+    "{schema}\n\n"
+    "And also pay attention to the examples listed below.\n\n"
+    "{examples}\n\n"
+    "If input question requires to draw plot, table or etc in that way, "
+    "just create SQL query which will help to retrive all the needed data with no errors.\n"
+    "So, use no comments. If you cannot create the query send to me the word 'Error' "
+    "following by error description. But check it twice before send me an Error.\n\n"
+    "Question: {query_str}\n"
+    "SQLQuery: "
+)
+TEXT_TO_SQL_STOP_TOKENS = ["SQLResult:", "SQLQuery:"]
+
+TEXT_TO_SQL_EXAMPLE_TMPL = (
+    "Question: {question}\n"
+    "SQLQuery: \n"
+    "{sql_query}\n"
+)
+TEXT_TO_SQL_NO_EXAMPLES_PROVIDED = "No examples provided. Use only the schema mentioned above."
+
+
+def prepare_sql_prompt_v2(dialect: str, db_schema: list[str], question: str, examples: list[Correction] = []) -> str:
+    db_schema_str = '\n'.join(map(str.strip, db_schema))
+    if len(examples):
+        examples_str = '\n'.join(map(
+            lambda x: TEXT_TO_SQL_EXAMPLE_TMPL.format(question=x.question, sql_query=x.answer),
+            examples))
+    else:
+        examples_str = TEXT_TO_SQL_NO_EXAMPLES_PROVIDED
+    return TEXT_TO_SQL_TMPL.format(
+        dialect=dialect,
+        schema=db_schema_str,
+        examples=examples_str,
+        query_str=question
+    )
+
+def restore_sql_prompt_v2(ai_answer: str) -> str:
+    return f"{ai_answer}"
+
+def prepare_sql_stop_sequences_v2() -> list[str]:
+    return TEXT_TO_SQL_STOP_TOKENS
 
 def __prepare_db_schema__(db_schema_by_table_strings):
     # remove extra spaces and write as comments (with #)
@@ -10,48 +63,8 @@ def __prepare_db_schema__(db_schema_by_table_strings):
     return '\n'.join(cleaned_schema)
 
 
-def __load_llama_db_reader__(db_config_section_name: str) -> any:
-    var_name = '__llama_db_reader_cashed__'
-    if var_name in globals():
-        return globals()[var_name]
-    
-    DatabaseReader = download_loader('DatabaseReader')
-
-    config = configparser.ConfigParser()
-    config.read("settings.ini")
-    db_config_section = config[db_config_section_name]
-    reader = DatabaseReader(
-        scheme = "postgresql",
-        host = db_config_section["Host"],
-        port = db_config_section["Port"],
-        user = db_config_section["User"],
-        password = db_config_section["Password"],
-        dbname = db_config_section["Database"],
-    )
-
-    globals()[var_name] = reader
-    return reader
-
-
-def __filter_db_schema_tables__(
-        db_schema_by_table_strings: list[str],
-        question: Interaction,
-        corrections: list[Correction]) -> list[str]:
-    
-    # filter tables by question context similarity
-    llama_db_reader = __load_llama_db_reader__('db')
-    for correction in corrections:
-        documents = llama_db_reader.load_data(query=correction.answer)
-        print(documents)
-        
-
-
-def __prepare_db_promt_part__(
-        db_schema_by_table_strings: list[str],
-        question: Interaction,
-        corrections: list[Correction]):
-    filtered_db_schema_by_table_strings = __filter_db_schema_tables__(db_schema_by_table_strings, question, corrections)
-    summarized_db_info = __prepare_db_schema__(filtered_db_schema_by_table_strings)
+def __prepare_db_promt_part__(db_schema_by_table_strings: list[str]):
+    summarized_db_info = __prepare_db_schema__(db_schema_by_table_strings)
     # create part of prompt with db
     return "-- ### Postgres SQL tables, with their properties:\n--\n" + summarized_db_info
 

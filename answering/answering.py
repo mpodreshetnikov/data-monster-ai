@@ -5,8 +5,8 @@ from db.dbaccess import DbAccess
 from tg_bot.correction import CorrectionDbAccess
 import logging, json
 from pandas import DataFrame
-from matplotlib.figure import Figure
 import answering.drawer as drawer
+import llama.db_indexing as db_indexing 
 
 # configure
 config = configparser.ConfigParser()
@@ -17,21 +17,29 @@ CorrectionsLimit: int = int(config["corrections"]["Limit"])
 
 logger = logging.getLogger(__name__)
 
-def answer(interaction: Interaction) -> Interaction:
-    global CorrectionsLimit
+db_query = db_indexing.create_query()
 
-    dbaccess = DbAccess("db")
-    db_schema = dbaccess.get_db_schema()
+def answer(interaction: Interaction) -> Interaction:
+    global CorrectionsLimit, db_query
+
+    dbaccess = DbAccess('db')
 
     corr_dbaccess = CorrectionDbAccess("corrections_db")
     examples = corr_dbaccess.get_good_corrections(interaction.question, CorrectionsLimit)
     logger.info(f"Got {len(examples)} examples for prompt")
 
-    prompt = prompts.prepare_sql_prompt(db_schema, interaction.question, examples)
+    db_schema = db_indexing.get_most_similar_tables(db_query, interaction.question)
+    all_tables: list[str] = []
+    for example in examples:
+        all_tables.extend(db_indexing.get_most_similar_tables(db_query, example.answer))
+    all_tables.extend(db_schema)
+    unique_tables = list(set(all_tables))
+
+    prompt = prompts.prepare_sql_prompt_v2('postgresql', unique_tables, interaction.question, examples)
     logger.info(f"Prompt builded")
 
     logger.info(f"Generation AI answers")
-    ai_db_requests = list(map(prompts.restore_sql_prompt, ai.generate_answer_code(prompt, prompts.prepare_sql_stop_sequences())))
+    ai_db_requests = list(map(prompts.restore_sql_prompt_v2, ai.generate_answer_code(prompt, prompts.prepare_sql_stop_sequences_v2())))
     logger.info(f"{len(ai_db_requests)} AI answers generated")
 
     dbaccess.try_set_answer_with_db_requests(interaction, ai_db_requests)
@@ -45,7 +53,7 @@ def answer(interaction: Interaction) -> Interaction:
 
 
 def try_set_type_of_answer(interaction: Interaction) -> None:
-    plot_pointing_substrings = ["plot", "graphic", "chart", "figure", "график", "диаграмм", "зависимост"]
+    plot_pointing_substrings = ["plot", "graph", "chart", "figure", "график", "диаграмм", "зависимост"]
     
     if DrawingTestMode:
         interaction.answer_type = AnswerType.PLOT
