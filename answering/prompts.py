@@ -1,12 +1,15 @@
 from tg_bot.correction import Correction
 from my_types import Interaction
 
+MAXIMUM_ROWS = 100
+
 TEXT_TO_SQL_TMPL = (
-    "Given an input question, create a single syntactically correct {dialect} query to run. "
+    "Given an input question, create a syntactically correct {dialect} query to run. "
     "You can order the results by a relevant column to return the most "
     "interesting examples in the database.\n"
-    "Never query for all the columns from a specific table, only ask for a the "
-    "few relevant columns given the question.\n"
+    "Never query for all the columns from a specific table, only ask for a "
+    "few relevant columns given the question. "
+    f"Never query for all the rows, only ask for a maximum {MAXIMUM_ROWS} rows.\n"
     "Pay attention to use only the column names that you can see in the schema "
     "description. "
     "Be careful to not query for columns that do not exist. "

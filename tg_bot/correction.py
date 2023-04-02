@@ -61,7 +61,10 @@ LIMIT %(limit)s
             response = cur.fetchall()
             good_corrections = list(map(lambda x: Correction(x[0], x[1]), response))
             logger.info(f"For question '{question}' following corrections returned:")
-            logger.info(json.dumps(list(map(lambda x: x.question, good_corrections))))
+            try:
+                logger.info(json.dumps(list(map(lambda x: x.question, good_corrections))))
+            except:
+                pass
             return good_corrections
 
 

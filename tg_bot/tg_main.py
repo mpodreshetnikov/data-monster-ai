@@ -5,13 +5,14 @@ import os, logging
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+import answering.context as chat_context
 
 logger = logging.getLogger(__name__)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("Chat started")
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Привет! Что хочешь узнать?")
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Привет! Я могу подсказать, как и что в школах у Феникса. Что хочешь узнать?")
 
 
 async def answer_question(update: Update, context: ContextTypes.DEFAULT_TYPE, debug=False):
@@ -38,7 +39,8 @@ async def answer_question(update: Update, context: ContextTypes.DEFAULT_TYPE, de
         context,
         chat_id,
         main_button_menu,
-        debug
+        debug,
+        chat_context_user_id=user_id
     )
     if not interaction: return
     logger.info("Answer builded successful")
@@ -82,6 +84,7 @@ async def answer_question(update: Update, context: ContextTypes.DEFAULT_TYPE, de
             finally:
                 os.remove(filename)
     
+    chat_context.add_interaction(user_id, interaction)
     # send post-message
     await context.bot.send_message(chat_id, text="Что еще хочешь узнать?")
 
@@ -93,11 +96,11 @@ async def __handle_answering_errors__(
         chat_id: int,
         main_button_menu: list[list[InlineKeyboardButton]],
         debug: bool = False,
-        ) -> Interaction | None:
+        **kwargs) -> Interaction | None:
     user_message = None
     error_message = None
     try:
-        interaction = answer_call(interaction)
+        interaction = answer_call(interaction, **kwargs)
     except ai.TryAiLaterException as e:
         user_message = "Превышен лимит запросов, попробуйте позже"
         error_message = str(e)
@@ -123,7 +126,8 @@ async def __handle_answering_errors__(
 
 def __build_filename__(question: str, user_id: int) -> str:
     question_str = question.replace("/", "_").replace(' ', '_').replace('\n', '_')[:40]
-    return f"{datetime.now().strftime('%d_%m_%Y_%H_%M_%S')}_{question_str}_{user_id}.png"
+    filename = f"{datetime.now().strftime('%d_%m_%Y_%H_%M_%S')}_{question_str}_{user_id}"
+    return f"{__slugify__(filename)}.png"
 
 
 def __build_button_menu__(
@@ -138,3 +142,23 @@ def __build_button_menu__(
     if footer_buttons:
         menu.append(footer_buttons if isinstance(footer_buttons, list) else [footer_buttons])
     return menu
+
+
+import unicodedata
+import re
+
+def __slugify__(value, allow_unicode=False):
+    """
+    Taken from https://github.com/django/django/blob/master/django/utils/text.py
+    Convert to ASCII if 'allow_unicode' is False. Convert spaces or repeated
+    dashes to single dashes. Remove characters that aren't alphanumerics,
+    underscores, or hyphens. Convert to lowercase. Also strip leading and
+    trailing whitespace, dashes, and underscores.
+    """
+    value = str(value)
+    if allow_unicode:
+        value = unicodedata.normalize('NFKC', value)
+    else:
+        value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
+    value = re.sub(r'[^\w\s-]', '', value.lower())
+    return re.sub(r'[-\s]+', '-', value).strip('-_')

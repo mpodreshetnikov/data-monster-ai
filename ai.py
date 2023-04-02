@@ -1,6 +1,8 @@
 import openai, openai.error
 import configparser, time, logging
 
+from my_types import Interaction, AnswerType
+
 # configure
 config = configparser.ConfigParser()
 config.read("settings.ini")
@@ -28,11 +30,11 @@ class TryAiLaterException(Exception):
         super().__init__(*args)
 
 
-def generate_answer_code(prompt: str, stop_sequence: list[str] = None) -> list[str]:
+def generate_answer_code(prompt: str, stop_sequence: list[str] = None, context: list[Interaction] = None) -> list[str]:
     global LimitRetries, RetriesTimeoutSeconds
     return list(map(str.rstrip,
                     __get_ai_responses_with_retries__(
-                        lambda: __get_ai_responses__(prompt, stop_sequence))))
+                        lambda: __get_ai_responses__(prompt, stop_sequence, context))))
 
 
 def get_embedding(prompt: str | list[str]) -> list[float] | list[list[float]]:
@@ -55,7 +57,7 @@ def __list_ai_models__() -> list[str]:
 logger.info(__list_ai_models__())
 
 
-def __get_ai_responses__(prompt: str, stop_sequence: list[str] = None) -> list[str]:
+def __get_ai_responses__(prompt: str, stop_sequence: list[str] = None, context: list[Interaction] = None) -> list[str]:
     global ChoicesOneRequest, TestMode, RequestTimeoutSeconds, AiModel, AiModelType, MaxAnswerTokens
 
     if TestMode:
@@ -69,6 +71,7 @@ def __get_ai_responses__(prompt: str, stop_sequence: list[str] = None) -> list[s
     temperature = 0.05
 
     if AiModelType == "completion":
+        # TODO: add context to prompt
         response = openai.Completion.create(
             model=AiModel,
             prompt=prompt,
@@ -82,8 +85,9 @@ def __get_ai_responses__(prompt: str, stop_sequence: list[str] = None) -> list[s
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
-                    {"role": "system", "content": "You are a helpful assystant for code and data analysis. You help to write SQL and Python code. You can also show data in tables and plots."},
-                    {"role": "user", "content": prompt}
+                    {"role": "system", "content": "You are a helpful assystant for code and data analysis. You help to write SQL and Python code for queries, tables and plots."},
+                    *__generate_messages_for_context__(context),
+                    {"role": "user", "content": prompt},
                 ],
             temperature=temperature,
             max_tokens=MaxAnswerTokens,
@@ -142,3 +146,32 @@ def __get_ai_responses_with_retries__(
                 continue
             else: raise e
     raise TryAiLaterException(f"Cannot get an answer: {retries_limit} retries with {retries_timeout_seconds}s sleep between. Try again later.")
+
+
+def __generate_messages_for_context__(context: list[Interaction]) -> list[dict[str, str]]:
+    MAX_ROWS = 20
+
+    if context is None: return []
+
+    messages = []
+
+    for interaction in context:
+        if interaction.question is not None:
+            messages.append({"role": "user", "content": interaction.question})
+
+        if interaction.answer_result is not None:
+            if interaction.answer_type == AnswerType.NO_DATA:
+                message = "Data for your request is not found"
+            elif interaction.answer_type == AnswerType.NUMBER:
+                message = f"{interaction.answer_result.iat[0, 0]}"
+            else:
+                data = interaction.answer_result
+                if len(data.index) > MAX_ROWS:
+                    cut_data = data.head(MAX_ROWS)
+                    message = f"Table with {len(data.index)} rows. First {MAX_ROWS} rows:\n```csv\n{cut_data.to_csv()}```"
+                else:
+                    message = f"Table with {len(data.index)} rows:\n```csv\n{data.to_csv()}```"
+            
+            messages.append({"role": "system", "content": message})
+
+    return messages

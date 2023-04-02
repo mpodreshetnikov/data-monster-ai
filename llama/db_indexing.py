@@ -3,6 +3,7 @@ import logging
 import sys
 from typing import Callable, Type, TypeVar
 from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
 from llama_index import LLMPredictor, SQLDatabase, GPTSimpleVectorIndex
 from llama_index.llm_predictor.chatgpt import ChatGPTLLMPredictor
 from langchain.chat_models import ChatOpenAI
@@ -17,11 +18,11 @@ def create_query() -> BaseGPTIndexQuery:
     llm_predictor = __build_llm_predictor__()
 
     conn_str = __build_conn_string__('db', 'postgresql')
-    sql_db = __build_sql_db__(conn_str)
+    sql_engine = __build_sql_engine__(conn_str)
 
     index = __with_cache__(
         GPTSimpleVectorIndex,
-        lambda: __build_db_index__(GPTSimpleVectorIndex, sql_db, llm_predictor),
+        lambda: __build_db_index__(GPTSimpleVectorIndex, sql_engine, llm_predictor),
         llm_predictor,
         cache_name='query_index'
     )
@@ -33,7 +34,18 @@ def create_query() -> BaseGPTIndexQuery:
     return __build_query_obj__(index, top_index_nodes_count=tables_to_take)
 
 
-def get_most_similar_tables(query_obj: BaseGPTIndexQuery, question: str) -> list[str]:
+def get_most_similar_tables(query_obj: BaseGPTIndexQuery, questions: str | list[str]) -> list[str]:
+    if isinstance(questions, str):
+        questions = [questions]
+        
+    all: list[str] = []
+    for q in questions:
+        all.extend(__get_most_similar_tables__(query_obj, q))
+    unique = list(set(all))
+    return unique
+
+
+def __get_most_similar_tables__(query_obj: BaseGPTIndexQuery, question: str) -> list[str]:
     nodes = query_obj.get_nodes_and_similarities_for_response(QueryBundle(question))
     return list(map(lambda x: x[0].text, nodes))
 
@@ -58,7 +70,8 @@ def __build_llm_predictor__() -> LLMPredictor:
     return llm_predictor
 
 
-def __build_db_index__(index_type: Type[BaseGPTIndex], sql_db: SQLDatabase, llm_predictor: LLMPredictor) -> BaseGPTIndex:
+def __build_db_index__(index_type: Type[BaseGPTIndex], sql_engine: Engine, llm_predictor: LLMPredictor) -> BaseGPTIndex:
+    sql_db = SQLDatabase(sql_engine)
     context_builder = SQLContextContainerBuilder(sql_db)
     table_schema_index = context_builder.derive_index_from_context(
         index_type,
@@ -79,7 +92,7 @@ def __with_cache__(
         index = index_type.load_from_disk(index_path, llm_predictor=llm_predictor)
     else:
         index = index_builder()
-        os.makedirs(dir)
+        os.makedirs(dir, exist_ok=True)
         index.save_to_disk(index_path)
     return index
 
@@ -123,7 +136,6 @@ def __build_conn_string__(config_db_name: str, db_type: str):
     return f"{db_type}://{conn['user']}:{conn['password']}@{conn['host']}:{conn['port']}/{conn['dbname']}"
 
 
-def __build_sql_db__(conn_string: str) -> SQLDatabase:
+def __build_sql_engine__(conn_string: str) -> Engine:
     engine = create_engine(conn_string)
-    sql_database = SQLDatabase(engine)
-    return sql_database
+    return engine

@@ -6,7 +6,8 @@ from tg_bot.correction import CorrectionDbAccess
 import logging, json
 from pandas import DataFrame
 import answering.drawer as drawer
-import llama.db_indexing as db_indexing 
+import llama.db_indexing as db_indexing
+import answering.context as chat_context
 
 # configure
 config = configparser.ConfigParser()
@@ -14,37 +15,43 @@ config.read("settings.ini")
 
 DrawingTestMode: bool = config.getboolean("drawing", "TestMode")
 CorrectionsLimit: int = int(config["corrections"]["Limit"])
+ContextDeep: int = int(config["chat_context"]["ContextDeep"])
 
 logger = logging.getLogger(__name__)
 
 db_query = db_indexing.create_query()
 
-def answer(interaction: Interaction) -> Interaction:
-    global CorrectionsLimit, db_query
+def answer(interaction: Interaction, chat_context_user_id: str = None) -> Interaction:
+    global CorrectionsLimit, db_query, ContextDeep
 
     dbaccess = DbAccess('db')
-
     corr_dbaccess = CorrectionDbAccess("corrections_db")
+
     examples = corr_dbaccess.get_good_corrections(interaction.question, CorrectionsLimit)
     logger.info(f"Got {len(examples)} examples for prompt")
 
-    db_schema = db_indexing.get_most_similar_tables(db_query, interaction.question)
-    all_tables: list[str] = []
-    for example in examples:
-        all_tables.extend(db_indexing.get_most_similar_tables(db_query, example.answer))
-    all_tables.extend(db_schema)
-    unique_tables = list(set(all_tables))
+    str_to_schema = [interaction.question, *[example.answer for example in examples]]
+    db_schema = db_indexing.get_most_similar_tables(db_query, str_to_schema)
 
-    prompt = prompts.prepare_sql_prompt_v2('postgresql', unique_tables, interaction.question, examples)
+    prompt = prompts.prepare_sql_prompt_v2('postgresql', db_schema, interaction.question, examples)
     logger.info(f"Prompt builded")
 
+    context = chat_context.get_context(chat_context_user_id, ContextDeep)
     logger.info(f"Generation AI answers")
-    ai_db_requests = list(map(prompts.restore_sql_prompt_v2, ai.generate_answer_code(prompt, prompts.prepare_sql_stop_sequences_v2())))
+    ai_db_requests = list(map(
+        prompts.restore_sql_prompt_v2,
+        ai.generate_answer_code(
+            prompt,
+            prompts.prepare_sql_stop_sequences_v2(),
+            context)))
     logger.info(f"{len(ai_db_requests)} AI answers generated")
 
     dbaccess.try_set_answer_with_db_requests(interaction, ai_db_requests)
     logger.info(f"Answer generated")
-    logger.info(json.dumps(interaction))
+    try:
+        logger.info(json.dumps(interaction))
+    except:
+        pass
     if interaction.answer_type == None:
         try_set_type_of_answer(interaction)
         logger.info(f"Answer type changed to {interaction.answer_type}")
