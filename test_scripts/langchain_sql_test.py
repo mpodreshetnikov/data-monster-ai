@@ -1,13 +1,15 @@
 from langchain.agents import create_sql_agent
 from langchain.agents.agent_toolkits import SQLDatabaseToolkit
 from langchain.sql_database import SQLDatabase
-from langchain.llms.openai import OpenAI
+from langchain.chat_models import ChatOpenAI
 from langchain.agents import AgentExecutor
 from langchain.callbacks import get_openai_callback
-from sqlalchemy import URL
+from sqlalchemy.engine import URL
 
+import os
 import time
 
+is_debug = True
 url = URL.create(
     "postgresql",
     username="gpt_bi_user",
@@ -16,18 +18,19 @@ url = URL.create(
     port="2401",
     database="dwh_uas",
 )
-
-print(url)
-
+schema = "dwh_uas"
 openai_api_key = "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"
 
-db = SQLDatabase.from_uri(url)
-toolkit = SQLDatabaseToolkit(db=db)
+os.environ["OPENAI_API_KEY"] = openai_api_key
+
+db = SQLDatabase.from_uri(url, schema=schema)
+llm = ChatOpenAI(verbose=is_debug)
+toolkit = SQLDatabaseToolkit(db=db, llm=llm)
 
 agent_executor = create_sql_agent(
-    llm=OpenAI(temperature=0, openai_api_key=openai_api_key),
+    llm=ChatOpenAI(verbose=is_debug),
     toolkit=toolkit,
-    verbose=True
+    verbose=is_debug,
 )
 
 #while True:
@@ -36,6 +39,7 @@ with get_openai_callback() as cb:
     start = time.time()
     response = agent_executor.run(question)
     end  = time.time()
+    print(f"Response: {response}")
     print(f"Time: {end-start}")
     print(f"Total Tokens: {cb.total_tokens}")
     print(f"Prompt Tokens: {cb.prompt_tokens}")
