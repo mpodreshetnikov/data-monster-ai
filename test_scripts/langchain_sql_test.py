@@ -2,7 +2,6 @@ from langchain.agents import create_sql_agent
 from langchain.agents.agent_toolkits import SQLDatabaseToolkit
 from langchain.sql_database import SQLDatabase
 from langchain.chat_models import ChatOpenAI
-from langchain.agents import AgentExecutor
 from langchain.callbacks import get_openai_callback
 from sqlalchemy.engine import URL
 
@@ -33,16 +32,16 @@ agent_executor = create_sql_agent(
     verbose=is_debug,
 )
 
-#while True:
-question = str(input())
-with get_openai_callback() as cb:
-    start = time.time()
-    response = agent_executor.run(question)
-    end  = time.time()
-    print(f"Response: {response}")
-    print(f"Time: {end-start}")
-    print(f"Total Tokens: {cb.total_tokens}")
-    print(f"Prompt Tokens: {cb.prompt_tokens}")
-    print(f"Completion Tokens: {cb.completion_tokens}")
-    print(f"Total Cost (USD): ${cb.total_cost}")
+while True:
+    question = str(input())
+    with get_openai_callback() as cb:
+        start = time.time()
+        response = agent_executor.run(question)
+        end  = time.time()
+        print(f"Response: {response}")
+        print(f"Time: {end-start}")
+        print(f"Total Tokens: {cb.total_tokens}")
+        print(f"Prompt Tokens: {cb.prompt_tokens}")
+        print(f"Completion Tokens: {cb.completion_tokens}")
+        print(f"Total Cost (USD): ${cb.total_cost}")
 
