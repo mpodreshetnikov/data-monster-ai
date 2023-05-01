@@ -1,8 +1,8 @@
 from langchain.agents import create_sql_agent
-from langchain.agents.agent_toolkits import SQLDatabaseToolkit
 from langchain.sql_database import SQLDatabase
 from langchain.chat_models import ChatOpenAI
 from langchain.callbacks import get_openai_callback
+from langchain.agents.mrkl.output_parser import OutputParserException
 from sqlalchemy.engine import URL
 
 import os
@@ -40,8 +40,11 @@ while True:
     print("Enter your question: ")
     question = str(input())
     with get_openai_callback() as cb:
-        response = agent_executor.run(question)
-        cb.on_llm_start = lambda: print("LLM started")
+        try:
+            response = agent_executor.run(question)
+        except OutputParserException as e:
+            print(f"Не удается распознать результат работы ИИ: {e}")
+            continue
         print(f"Response: {response}")
         print(f"Total Tokens: {cb.total_tokens}")
         print(f"Prompt Tokens: {cb.prompt_tokens}")

@@ -11,7 +11,7 @@ You MUST double check your query before executing it. If you get an error while 
 
 DO NOT make any DML statements (INSERT, UPDATE, DELETE, DROP etc.) to the database.
 
-If the question does not seem related to the information from the database, just return "I don't know" as the answer.
+If the question does not seem related to the information from the database, try to ask user for more detailed information via human tool.
 """
 
 SQL_SUFFIX = """Begin!

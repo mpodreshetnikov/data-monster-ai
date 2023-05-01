@@ -1,4 +1,4 @@
-def get_db_doc_toolkit(doc_path: str, doc_store_name: str = "db_doc_store"):
+def get_db_doc_toolkit(doc_path: str, doc_store_name: str = "db_hints_store"):
     from langchain.embeddings.openai import OpenAIEmbeddings
     from langchain.vectorstores import Chroma
     from langchain.text_splitter import CharacterTextSplitter
@@ -18,8 +18,8 @@ def get_db_doc_toolkit(doc_path: str, doc_store_name: str = "db_doc_store"):
         VectorStoreInfo,
     )
     vectorstore_info = VectorStoreInfo(
-        name="database_description",
-        description="insightful description of the database, contains hints about data, ask it about particular data relationships",
+        name="database_hints",
+        description="insightful hints about data from the database, use it when don't see needed info in database scheme",
         vectorstore=db_doc_store
     )
     toolkit = VectorStoreToolkit(vectorstore_info=vectorstore_info)
