@@ -7,6 +7,9 @@ from sqlalchemy.engine import URL
 
 import os
 
+from db_data_interaction.toolkit import DbDataInteractionToolkit
+from prompts.agent_prompts import SQL_PREFIX, SQL_SUFFIX
+
 is_debug = True
 url = URL.create(
     "postgresql",
@@ -23,12 +26,14 @@ os.environ["OPENAI_API_KEY"] = openai_api_key
 
 db = SQLDatabase.from_uri(url, schema=schema)
 llm = ChatOpenAI(verbose=is_debug)
-toolkit = SQLDatabaseToolkit(db=db, llm=llm)
+toolkit = DbDataInteractionToolkit(db=db, llm=llm, db_doc_path="v2/test_scripts/db_doc.txt")
 
 agent_executor = create_sql_agent(
     llm=ChatOpenAI(verbose=is_debug),
     toolkit=toolkit,
     verbose=is_debug,
+    prefix=SQL_PREFIX,
+    suffix=SQL_SUFFIX,
 )
 
 while True:
@@ -36,6 +41,7 @@ while True:
     question = str(input())
     with get_openai_callback() as cb:
         response = agent_executor.run(question)
+        cb.on_llm_start = lambda: print("LLM started")
         print(f"Response: {response}")
         print(f"Total Tokens: {cb.total_tokens}")
         print(f"Prompt Tokens: {cb.prompt_tokens}")
