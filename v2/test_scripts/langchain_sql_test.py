@@ -6,7 +6,6 @@ from langchain.callbacks import get_openai_callback
 from sqlalchemy.engine import URL
 
 import os
-import time
 
 is_debug = True
 url = URL.create(
