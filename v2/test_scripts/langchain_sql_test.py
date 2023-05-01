@@ -33,13 +33,11 @@ agent_executor = create_sql_agent(
 )
 
 while True:
+    print("Enter your question: ")
     question = str(input())
     with get_openai_callback() as cb:
-        start = time.time()
         response = agent_executor.run(question)
-        end  = time.time()
         print(f"Response: {response}")
-        print(f"Time: {end-start}")
         print(f"Total Tokens: {cb.total_tokens}")
         print(f"Prompt Tokens: {cb.prompt_tokens}")
         print(f"Completion Tokens: {cb.completion_tokens}")
