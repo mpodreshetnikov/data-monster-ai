@@ -5,3 +5,4 @@ venv
 settings.ini
 log.txt
 indices
+*store
