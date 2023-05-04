@@ -10,6 +10,7 @@ import os
 from db_data_interaction.toolkit import DbDataInteractionToolkit
 from prompts.agent_prompts import SQL_PREFIX, SQL_SUFFIX
 
+
 is_debug = True
 url = URL.create(
     "postgresql",

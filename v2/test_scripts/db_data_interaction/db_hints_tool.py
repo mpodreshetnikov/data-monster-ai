@@ -1,4 +1,6 @@
-def get_db_doc_toolkit(doc_path: str, doc_store_name: str = "db_hints_store"):
+from langchain.agents.agent_toolkits.base import BaseToolkit
+
+def get_db_hints_toolkit(doc_path: str, doc_store_name: str = "db_hints_store") -> BaseToolkit:
     from langchain.embeddings.openai import OpenAIEmbeddings
     from langchain.vectorstores import Chroma
     from langchain.text_splitter import CharacterTextSplitter
