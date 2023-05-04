@@ -41,7 +41,7 @@ WHERE relkind = 'r'
     fin_tables = [d for d in results_tables if all(d.values())]
     fin_cols = [d for d in results_tables if all(d.values())]
 
-    return str([fin_cols, fin_tables])
+    return str([fin_tables, fin_cols])
 
 test_url = URL.create(
     "postgresql",
