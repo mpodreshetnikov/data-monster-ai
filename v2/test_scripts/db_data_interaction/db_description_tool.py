@@ -31,7 +31,8 @@ class ListSQLDatabaseWithCommentsTool(ListSQLDatabaseTool):
         """Get the schema for a specific table."""
         if self.db._include_tables:
             tables_to_take = self.db._include_tables
-        tables_to_take = self.db._all_tables - self.db._ignore_tables
+        else:
+            tables_to_take = self.db._all_tables - self.db._ignore_tables
 
         # return cached data if possible
         cache_key = str.join(",", tables_to_take)
