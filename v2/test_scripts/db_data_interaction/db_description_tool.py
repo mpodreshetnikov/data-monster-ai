@@ -55,32 +55,28 @@ class ListSQLDatabaseWithCommentsTool(ListSQLDatabaseTool):
 
 
 
-# class InfoSQLDatabaseTool(BaseSQLDatabaseTool, BaseTool):
-#     """Tool for getting metadata about a SQL database."""
+class InfoSQLDatabasewithCommentsTool(InfoSQLDatabaseTool):
 
-#     name = "schema_sql_db"
-#     description = """
-#     Input to this tool is a comma-separated list of tables, output is the schema and sample rows for those tables.
-#     Be sure that the tables actually exist by calling list_tables_sql_db first!
+    def _run(
+        self,
+        table_name: str,
+        tool_input: str = "",
+        run_manager: Optional[CallbackManagerForToolRun] = None,
+    ) -> str:
+        column_strings = []
+        
+        table = self.db._metadata.tables[table_name]
+        for column in table.columns:
+            comment = column.comment
+            if comment:
+                column_strings.append(f"{column.name} ({comment})")
+            else:
+                column_strings.append(column.name)
 
-#     Example Input: "table1, table2, table3"
-#     """
+        
+        return ", ".join(column_strings)
 
-#     def _run(
-#         self,
-#         table_names: str,
-#         run_manager: Optional[CallbackManagerForToolRun] = None,
-#     ) -> str:
-#         """Get the schema for tables in a comma-separated list."""
-#         return self.db.get_table_info_no_throw(table_names.split(", "))
-
-#     async def _arun(
-#         self,
-#         table_name: str,
-#         run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
-#     ) -> str:
-#         raise NotImplementedError("SchemaSqlDbTool does not support async")
-
+ 
 
 class SQLDatabaseToolkitModified(BaseToolkit):
     """Toolkit for interacting with SQL databases."""
@@ -102,7 +98,7 @@ class SQLDatabaseToolkitModified(BaseToolkit):
         """Get the tools in the toolkit."""
         return [
             QuerySQLDataBaseTool(db=self.db),
-            InfoSQLDatabaseTool(db=self.db),
+            InfoSQLDatabasewithCommentsTool(db=self.db),
             ListSQLDatabaseWithCommentsTool(db=self.db),
             QueryCheckerTool(db=self.db, llm=self.llm),
         ]
