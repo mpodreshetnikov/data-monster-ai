@@ -38,8 +38,10 @@ WHERE relkind = 'r'
     response_tables = con.execute(statement_tables)
     results_cols = response_cols.mappings().all()
     results_tables = response_tables.mappings().all()
+    fin_tables = [d for d in results_tables if all(d.values())]
+    fin_cols = [d for d in results_tables if all(d.values())]
 
-    return str([results_cols, results_tables])
+    return str([fin_cols, fin_tables])
 
 test_url = URL.create(
     "postgresql",
