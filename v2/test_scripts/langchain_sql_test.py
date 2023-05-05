@@ -18,7 +18,7 @@ url = URL.create(
     password="uzH#Q%N9YvM3f!",  
     host="62.109.28.9",
     port="2401",
-    database="dwh_uas",
+    database="dwh_uas2",
 )
 schema = "dwh_uas"
 openai_api_key = "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"

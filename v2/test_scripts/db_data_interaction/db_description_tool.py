@@ -1,13 +1,15 @@
-from typing import Iterable, Optional
+import re
+from typing import Optional
 from pydantic import Field
 
+
 from sqlalchemy.engine import URL
+from sqlalchemy.schema import CreateTable
 
 from langchain import SQLDatabase
 from langchain.agents.agent_toolkits.base import BaseToolkit
 from langchain.base_language import BaseLanguageModel
 from langchain.callbacks.manager import (
-    AsyncCallbackManagerForToolRun,
     CallbackManagerForToolRun,
 )
 from langchain.tools.base import BaseTool
@@ -55,27 +57,66 @@ class ListSQLDatabaseWithCommentsTool(ListSQLDatabaseTool):
 
 
 
-class InfoSQLDatabasewithCommentsTool(InfoSQLDatabaseTool):
+class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
 
     def _run(
         self,
-        table_name: str,
+        table_names: str,
         tool_input: str = "",
         run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> str:
-        column_strings = []
-        
-        table = self.db._metadata.tables[table_name]
-        for column in table.columns:
-            comment = column.comment
-            if comment:
-                column_strings.append(f"{column.name} ({comment})")
-            else:
-                column_strings.append(column.name)
+        table_names = table_names.split(", ")
 
-        
-        return ", ".join(column_strings)
+        ### Method was taken from InfoSQLDatabaseTool and modified to include column comments ###
 
+        try:
+            all_table_names = self.db.get_usable_table_names()
+            if table_names is not None:
+                missing_tables = set(table_names).difference(all_table_names)
+                if missing_tables:
+                    raise ValueError(f"table_names {missing_tables} not found in database")
+                all_table_names = table_names
+
+            meta_tables = [
+                tbl
+                for tbl in self.db._metadata.sorted_tables
+                if tbl.name in set(all_table_names)
+                and not (self.db.dialect == "sqlite" and tbl.name.startswith("sqlite_"))
+            ]
+
+            tables = []
+            for table in meta_tables:
+                if self.db._custom_table_info and table.name in self.db._custom_table_info:
+                    tables.append(self.db._custom_table_info[table.name])
+                    continue
+
+                create_table = str(CreateTable(table).compile(self.db._engine))
+                table_info = f"{create_table.rstrip()}"
+                has_extra_info = (
+                    self.db._indexes_in_table_info or self.db._sample_rows_in_table_info
+                )
+
+                # add column comments
+                for column in table.columns:
+                    if column.comment:
+                        f_pattern = r"(" + column.name + r"[^,\n]*)(,?\n?)"
+                        s_pattern = r"\1 COMMENT '" + column.comment + r"'\2"
+                        table_info = re.sub(f_pattern, s_pattern, table_info, count=1)
+
+                if has_extra_info:
+                    table_info += "\n\n/*"
+                if self.db._indexes_in_table_info:
+                    table_info += f"\n{self.db._get_table_indexes(table)}\n"
+                if self.db._sample_rows_in_table_info:
+                    table_info += f"\n{self.db._get_sample_rows(table)}\n"
+                if has_extra_info:
+                    table_info += "*/"
+                tables.append(table_info)
+            final_str = "\n\n".join(tables)
+            return final_str
+        except ValueError as e:
+            """Format the error message"""
+            return f"Error: {e}"
  
 
 class SQLDatabaseToolkitModified(BaseToolkit):
@@ -98,7 +139,7 @@ class SQLDatabaseToolkitModified(BaseToolkit):
         """Get the tools in the toolkit."""
         return [
             QuerySQLDataBaseTool(db=self.db),
-            InfoSQLDatabasewithCommentsTool(db=self.db),
+            InfoSQLDatabaseWithCommentsTool(db=self.db),
             ListSQLDatabaseWithCommentsTool(db=self.db),
             QueryCheckerTool(db=self.db, llm=self.llm),
         ]
