@@ -15,14 +15,14 @@ is_debug = True
 url = URL.create(
     "postgresql",
     username="gpt_bi_user",
-    password="uzH#Q%N9YvM3f!",  
+    password="L4swy64n9fJkNt",  
     host="62.109.28.9",
     port="2401",
     database="dwh_uas2",
 )
 schema = "dwh_uas"
 openai_api_key = "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"
-tables_to_use = ["uas_cash_session_doc", "uas_cash_cheque", "uas_cash_cheque_item", "uas_cash_cheque_item_pt", "uas_cash_cheque_sum", "uas_data_pay_type_org", "uas_data_med_nomenclature", "uas_data_user"]
+tables_to_use = ["uas_cash_session_doc", "uas_cash_cheque", "uas_cash_cheque_item", "uas_cash_cheque_sum", "uas_data_med_nomenclature", "uas_data_user"]
 
 os.environ["OPENAI_API_KEY"] = openai_api_key
 
@@ -39,7 +39,7 @@ agent_executor = create_sql_agent(
 )
 
 while True:
-    print("Enter your question: ")
+    print("Задай вопрос: ")
     question = str(input())
     with get_openai_callback() as cb:
         try:
@@ -48,8 +48,5 @@ while True:
             print(f"Не удается распознать результат работы ИИ: {e}")
             continue
         print(f"Response: {response}")
-        print(f"Total Tokens: {cb.total_tokens}")
-        print(f"Prompt Tokens: {cb.prompt_tokens}")
-        print(f"Completion Tokens: {cb.completion_tokens}")
-        print(f"Total Cost (USD): ${cb.total_cost}")
+        print(cb)
 

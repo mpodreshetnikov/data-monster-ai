@@ -1,3 +1,3 @@
-The database contains information about the users of cash registers, which are installed in the pharmacies "Gubernskie Apteki".
-For the management of the "Gubernskie Apteki", cash register users are employees.
-To get cashiers/employees by a pharmacy, use the "uas_cash_session_doc" table. It is important to note that the columns: "owner_key" is the pharmacy key, and "user_id" is the employee ID.
+The database contains information about the users of cash registers, which are installed in the pharmacies "Губернские аптеки".
+For the management of the "Губернские аптеки", cash register users are employees.
+To get cashiers/employees in a pharmacy, use the "uas_cash_session_doc" table. It is important to note that the columns: "owner_key" is the pharmacy key, and "user_id" is the employee ID.

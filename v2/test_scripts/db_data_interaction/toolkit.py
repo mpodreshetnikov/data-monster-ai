@@ -12,9 +12,10 @@ class DbDataInteractionToolkit(SQLDatabaseToolkitModified, BaseToolkit):
     db_doc_path: str = Field(description="Path to the database documentation")
 
     def get_tools(self) -> list[BaseTool]:
-        tools: list[BaseTool] = [HumanInputRun()]
+        tools: list[BaseTool] = []
         tools.extend(SQLDatabaseToolkitModified.get_tools(self))
         if self.db_doc_path:
             db_doc_tool = get_db_hints_toolkit(self.db_doc_path)
             tools.extend(db_doc_tool.get_tools())
+        # tools.append(HumanInputRun())
         return tools

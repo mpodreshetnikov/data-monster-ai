@@ -20,8 +20,8 @@ def get_db_hints_toolkit(doc_path: str, doc_store_name: str = "db_hints_store") 
         VectorStoreInfo,
     )
     vectorstore_info = VectorStoreInfo(
-        name="database_hints",
-        description="insightful hints about data from the database, use it when don't see needed info in database scheme",
+        name="database hints",
+        description="hints how to query the question from the database. Always use it BEFORE asking a human. Use this tool in english only.",
         vectorstore=db_doc_store
     )
     toolkit = VectorStoreToolkit(vectorstore_info=vectorstore_info)
