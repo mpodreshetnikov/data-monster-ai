@@ -59,7 +59,7 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
 
     description = """
     Input to this tool is a comma-separated list of tables, output is the schema: columns, foreign keys and sample rows for those tables.
-    Be sure that the tables actually exist by calling 'list_tables_sql_db' first and don't ask more than 3 tables once!
+    Be sure that the tables actually exist by calling 'list_tables_sql_db' first and don't ask more than one tables once!
 
     Example Input: "table1, table2, table3"
     """
@@ -67,12 +67,12 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
 
     def _run(
         self,
-        table_names: str,
+        table_name: str,
         tool_input: str = "",
         run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> str:
-        table_names = table_names.split(", ")
-
+        # table_names = table_names.split(", ")
+        table_names = [table_name]
         ### Method was taken from InfoSQLDatabaseTool and modified to include column comments ###
 
         try:

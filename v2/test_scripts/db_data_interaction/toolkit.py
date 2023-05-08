@@ -17,5 +17,5 @@ class DbDataInteractionToolkit(SQLDatabaseToolkitModified, BaseToolkit):
         if self.db_doc_path:
             db_doc_tool = get_db_hints_toolkit(self.db_doc_path)
             tools.extend(db_doc_tool.get_tools())
-        # tools.append(HumanInputRun())
+        tools.append(HumanInputRun())
         return tools
