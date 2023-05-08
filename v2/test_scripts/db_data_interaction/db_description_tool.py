@@ -59,9 +59,9 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
 
     description = """
     Input to this tool is a comma-separated list of tables, output is the schema: columns, foreign keys and sample rows for those tables.
-    Be sure that the tables actually exist by calling 'list_tables_sql_db' first and don't ask more than 3 tables once!
+    Be sure that the tables actually exist by calling 'list_tables_sql_db' first and don't ask more than 1 tables once!
 
-    Example Input: "table1, table2, table3"
+    Example Input: "table1"
     """
 
 
