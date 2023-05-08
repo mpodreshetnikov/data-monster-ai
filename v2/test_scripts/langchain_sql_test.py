@@ -10,6 +10,7 @@ import os
 
 from db_data_interaction.toolkit import DbDataInteractionToolkit
 from prompts.agent_prompts import SQL_PREFIX, SQL_SUFFIX
+from monitoring.callback import DefaultCallbackHandler
 
 
 is_debug = True
@@ -46,14 +47,14 @@ while True:
     question = str(input())
     with get_openai_callback() as cb:
         # prepare prompt preffix
-        db_hint = toolkit.get_db_hint(question)
-        query_hints = toolkit.get_query_hints(question, 2)
-        unique_tables = # TODO get unique tables from query_hints
-        tables_info = # TODO get tables info from sql info tool somehow
-        # TODO aggregate all the info above into a prompt prefix
+        # db_hint = toolkit.get_db_hint(question)
+        # query_hints = toolkit.get_query_hints(question, 2)
+        # unique_tables = # TODO get unique tables from query_hints
+        # tables_info = # TODO get tables info from sql info tool somehow
+        # # TODO aggregate all the info above into a prompt prefix
 
         try:
-            response = agent_executor.run(question)
+            response = agent_executor.run(question, callbacks=[DefaultCallbackHandler()])
         except OutputParserException as e:
             print(f"Не удается распознать результат работы ИИ: {e}")
             continue
