@@ -1,11 +1,14 @@
 from langchain.agents.agent_toolkits.base import BaseToolkit
+from langchain.base_language import BaseLanguageModel
 
-def get_db_hints_toolkit(doc_path: str, doc_store_name: str = "db_hints_store") -> BaseToolkit:
+
+def get_db_hints_tools(llm: BaseLanguageModel, doc_path: str, doc_store_name: str = "db_hints_store") -> BaseToolkit:
     from langchain.embeddings.openai import OpenAIEmbeddings
     from langchain.vectorstores import Chroma
     from langchain.text_splitter import CharacterTextSplitter
     from langchain.document_loaders import TextLoader
-    
+    from langchain.tools.vectorstore.tool import VectorStoreQATool
+
     loader = TextLoader(doc_path)
     documents = loader.load()
     text_splitter = CharacterTextSplitter(separator='\n', chunk_size=400, chunk_overlap=200)
@@ -15,15 +18,16 @@ def get_db_hints_toolkit(doc_path: str, doc_store_name: str = "db_hints_store") 
     db_doc_store = Chroma.from_documents(
         texts, embeddings, collection_name=doc_store_name, persist_directory=doc_store_name)
 
-    from langchain.agents.agent_toolkits import (
-        VectorStoreToolkit,
-        VectorStoreInfo,
+    name="database hints"
+    description="hints how to query the question from the database. Always use it BEFORE asking a human. Use this tool in english only."
+    vector_store_description = VectorStoreQATool.get_description(
+        name, description
     )
-    vectorstore_info = VectorStoreInfo(
-        name="database hints",
-        description="hints how to query the question from the database. Always use it BEFORE asking a human. Use this tool in english only.",
-        vectorstore=db_doc_store
+    qa_tool = VectorStoreQATool(
+        name=name,
+        description=vector_store_description,
+        vectorstore=db_doc_store,
+        llm=llm,
     )
-    toolkit = VectorStoreToolkit(vectorstore_info=vectorstore_info)
-    
-    return toolkit
+
+    return [qa_tool]

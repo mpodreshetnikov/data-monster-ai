@@ -1,0 +1,30 @@
+list:
+  - question: Сколько было чеков в каждой аптеке?
+    tables: [uas_cash_cheque, uas_cash_session_doc]
+    query: |
+      SELECT ucsd.owner_key, COUNT(*) AS c
+      FROM uas_cash_cheque ucc
+      JOIN uas_cash_session_doc ucsd ON ucsd.session_id = ucc.cash_session_id
+      GROUP BY ucsd.owner_key
+      ORDER BY c DESC;
+  - question: Во сколько 3 марта открылась первая касса в аптеке с ключом 76287?
+    tables: [uas_cash_session_doc]
+    query: |
+      SELECT ucsd.dt_begin
+      FROM uas_cash_session_doc ucsd
+      WHERE ucsd.owner_key = '76287' AND DATE(ucsd.dt_begin) = '03-03-2023'
+      ORDER BY ucsd.dt_begin 
+      LIMIT 1;
+  - question: Какая самая популярная акция по сумме продаж в феврале?
+    tables: [uas_cash_cheque, uas_cash_cheque_item]
+    query: |
+      SELECT ucci.discont_name, TRUNC(SUM(ucci."result")::DECIMAL, 2)
+      FROM uas_cash_cheque ucc 
+      JOIN uas_cash_cheque_item ucci ON ucci.cheque_id = ucc.cheque_id 
+      WHERE
+        EXTRACT(month FROM ucc.dt_create) = 2
+        AND EXTRACT(year FROM ucc.dt_create) = 2023
+        AND ucci.discont_type IS NOT NULL
+      GROUP BY ucci.discont_type, ucci.discont_name 
+      ORDER BY SUM(ucci."result") DESC
+      LIMIT 1
