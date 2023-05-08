@@ -47,13 +47,21 @@ while True:
     question = str(input())
     with get_openai_callback() as cb:
         # prepare prompt preffix
-        # db_hint = toolkit.get_db_hint(question)
-        # query_hints = toolkit.get_query_hints(question, 2)
-        # unique_tables = # TODO get unique tables from query_hints
-        # tables_info = # TODO get tables info from sql info tool somehow
-        # # TODO aggregate all the info above into a prompt prefix
-
+        db_hint = toolkit.get_db_hint(question)
+        query_hints = toolkit.get_query_hints(question, 2)
+        query_hints_str = ', '.join([f"question: {d.question}, query: '{d.query}'" for d in query_hints])
+        unique_tables = list(set(table for hint in query_hints for table in hint.tables))
+        tables_info = ''.join(toolkit.tools[1]._run(table) for table in unique_tables)
+        SQL_PREFIX += f'Для ответа на запрос специально для вас приготовили таблицу/таблицы, которыми необходимо пользоваться:{unique_tables}. Краткая информация о таблицах:{tables_info}. Примеры наболее похожих запросов {query_hints_str}'
         try:
+            agent_executor = create_sql_agent(
+                llm=ChatOpenAI(verbose=is_debug),
+                toolkit=toolkit,
+                verbose=is_debug,
+                prefix=SQL_PREFIX,
+                suffix=SQL_SUFFIX,
+            )
+
             response = agent_executor.run(question, callbacks=[DefaultCallbackHandler()])
         except OutputParserException as e:
             print(f"Не удается распознать результат работы ИИ: {e}")
