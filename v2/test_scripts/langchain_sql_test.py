@@ -21,14 +21,14 @@ url = URL.create(
     database="dwh_uas2",
 )
 schema = "dwh_uas"
-openai_api_key = "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"
+openai_api_key = "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"
 tables_to_use = ["uas_cash_session_doc", "uas_cash_cheque", "uas_cash_cheque_item", "uas_cash_cheque_sum", "uas_data_med_nomenclature", "uas_data_user"]
 
 os.environ["OPENAI_API_KEY"] = openai_api_key
 
 db = SQLDatabase.from_uri(url, schema=schema, include_tables=tables_to_use)
 llm = ChatOpenAI(verbose=is_debug)
-toolkit = DbDataInteractionToolkit(db=db, llm=llm, db_doc_path="v2/test_scripts/db_doc.txt")
+toolkit = DbDataInteractionToolkit(db=db, llm=llm, db_doc_path="v2/test_scripts/db_doc.txt", json_path = "v2/test_scripts/query_examples.yaml")
 
 agent_executor = create_sql_agent(
     llm=ChatOpenAI(verbose=is_debug),
