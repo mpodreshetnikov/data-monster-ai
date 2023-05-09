@@ -50,7 +50,7 @@ class SQLQueryHintsToolkit(BaseToolkit):
         return json_toolkit.get_tools()
     
     def get_top_hints(self, question: str, limit: int) -> list[SQLQueryHint]:
-        data: list[Document] = self.vector_store.search(question, search_type="similarity", k=limit)
+        data: list[Document] = self.vector_store.search(question, search_type="mmr", k=limit)
         hints = list(map(lambda x: SQLQueryHint(**yaml.safe_load(x.metadata["cls"])), data))
         return hints
     

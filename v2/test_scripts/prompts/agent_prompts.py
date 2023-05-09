@@ -3,7 +3,7 @@ Given an input question, create syntactically correct {dialect} queries to run.
 
 Unless the user specifies a specific number of examples they want, always limit your query to no more than {top_k} results.
 Never query all columns from a particular table, query only the relevant columns given the question.
-Never consider remote entities unless you are asked to.
+Never consider removed and archived entities unless you are asked to.
 DO NOT query non-existent columns. Check table information before querying the database!
 DO NOT make any DML statements (INSERT, UPDATE, DELETE, DROP, etc.) on the database.
 """
