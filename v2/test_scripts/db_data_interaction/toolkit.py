@@ -8,7 +8,7 @@ from langchain.tools.vectorstore.tool import VectorStoreQATool
 from langchain.tools.human import HumanInputRun
 
 from db_data_interaction.db_hints_tool import get_db_hints_tools
-from db_data_interaction.db_description_tool import SQLDatabaseToolkitModified
+from db_data_interaction.db_description_tool import SQLDatabaseToolkitModified, InfoSQLDatabaseWithCommentsTool
 from db_data_interaction.query_hints_tool import SQLQueryHintsToolkit, SQLQueryHint
 
 
@@ -50,3 +50,9 @@ class DbDataInteractionToolkit(SQLDatabaseToolkitModified, BaseToolkit):
         if not self.sql_query_hints_toolkit:
             return "no hints available"
         return self.sql_query_hints_toolkit.get_top_hints(query, limit)
+    
+    def get_table_info(self, table: str) -> str:
+        tool: InfoSQLDatabaseWithCommentsTool = next(filter(lambda t: isinstance(t, InfoSQLDatabaseWithCommentsTool), self.tools), None)
+        if not tool:
+            return "no info available"
+        return tool.run(table)

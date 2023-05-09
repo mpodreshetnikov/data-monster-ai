@@ -8,8 +8,6 @@ DO NOT query non-existent columns. Check table information before querying the d
 DO NOT make any DML statements (INSERT, UPDATE, DELETE, DROP, etc.) on the database.
 """
 
-# 2) ask user for more detailed information via human tool.
-
 SQL_SUFFIX = """Begin!
 
 Question: {input}

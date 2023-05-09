@@ -50,7 +50,7 @@ while True:
 
         # Получаем уникальные таблицы из подсказок и получаем информацию о каждой таблице
         unique_tables = list(set(table for hint in query_hints for table in hint.tables))
-        tables_info = ''.join(toolkit.tools[1]._run(table) for table in unique_tables)
+        tables_info = ''.join(toolkit.get_table_info(table) for table in unique_tables)
 
         # Формируем строку с информацией о таблицах и примерами похожих запросов для вывода
         table_info_str = f"Для ответа на запрос специально для вас приготовили таблицу/таблицы, которыми необходимо пользоваться: {unique_tables}. Краткая информация о таблицах: {tables_info}."
@@ -68,7 +68,6 @@ while True:
                 prefix=SQL_PREFIX,
                 suffix=SQL_SUFFIX,
             )
-
             response = agent_executor.run(question, callbacks=[DefaultCallbackHandler()])
         except OutputParserException as e:
             print(f"Не удается распознать результат работы ИИ: {e}")
