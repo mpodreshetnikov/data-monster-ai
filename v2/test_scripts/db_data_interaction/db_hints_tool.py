@@ -23,6 +23,7 @@ def get_db_hints_tools(llm: BaseLanguageModel, doc_path: str, doc_store_name: st
     vector_store_description = VectorStoreQATool.get_description(
         name, description
     )
+    
     qa_tool = VectorStoreQATool(
         name=name,
         description=vector_store_description,
