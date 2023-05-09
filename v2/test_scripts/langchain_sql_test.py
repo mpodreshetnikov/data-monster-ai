@@ -39,7 +39,7 @@ while True:
     print("Задай вопрос: ")
     question = str(input())
     with get_openai_callback() as cb:
-        agent_prefix = get_formatted_prefix_with_additional_info(toolkit, question, query_hints_limit=2)
+        agent_prefix = get_formatted_prefix_with_additional_info(toolkit, question, query_hints_limit=1)
         print(agent_prefix)
         try:
             agent_executor = create_sql_agent(
