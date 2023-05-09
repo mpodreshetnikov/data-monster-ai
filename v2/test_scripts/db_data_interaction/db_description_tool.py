@@ -107,7 +107,7 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
                         f_pattern = r"(" + column.name + r"[^,\n]*)(,?\n?)"
                         s_pattern = r"\1 COMMENT '" + column.comment + r"'\2"
                         table_info = re.sub(f_pattern, s_pattern, table_info, count=1)
-
+            '''
                 if has_extra_info:
                     table_info += "\n\n/*"
                 if self.db._indexes_in_table_info:
@@ -118,7 +118,8 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
                     table_info += "*/"
                 tables.append(table_info)
             final_str = "\n\n".join(tables)
-            return final_str
+            '''
+            return table_info
         except ValueError as e:
             """Format the error message"""
             return f"Error: {e}"

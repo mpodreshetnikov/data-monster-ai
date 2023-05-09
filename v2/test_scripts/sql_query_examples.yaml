@@ -1,30 +1,75 @@
 list:
-  - question: Сколько было чеков в каждой аптеке?
-    tables: [uas_cash_cheque, uas_cash_session_doc]
+  - question: Выведи первых 3 сотрудников/рабочих с должностью фармацевта в штате?
+    tables: [uas_data_user]
     query: |
-      SELECT ucsd.owner_key, COUNT(*) AS c
-      FROM uas_cash_cheque ucc
-      JOIN uas_cash_session_doc ucsd ON ucsd.session_id = ucc.cash_session_id
-      GROUP BY ucsd.owner_key
-      ORDER BY c DESC;
-  - question: Во сколько 3 марта открылась первая касса в аптеке с ключом 76287?
-    tables: [uas_cash_session_doc]
+      SELECT *
+      FROM uas_data_user
+      WHERE position ILIKE 'Фармацевт' AND is_deleted = 0
+      LIMIT 3
+  - question: Сколько сотрудников в Аптеке 190 Красноярск?
+    tables: [uas_cash_session_doc, uas_data_user, uas_data_cnt_company]
     query: |
-      SELECT ucsd.dt_begin
-      FROM uas_cash_session_doc ucsd
-      WHERE ucsd.owner_key = '76287' AND DATE(ucsd.dt_begin) = '03-03-2023'
-      ORDER BY ucsd.dt_begin 
-      LIMIT 1;
-  - question: Какая самая популярная акция по сумме продаж в феврале?
-    tables: [uas_cash_cheque, uas_cash_cheque_item]
+      SELECT count(*)
+      FROM uas_cash_session_doc
+      JOIN uas_data_user
+      ON uas_data_user.user_id = uas_cash_session_doc.user_id
+      JOIN uas_data_cnt_company
+      ON uas_data_cnt_company.cnt_company_id = uas_cash_session_doc.owner_id
+      WHERE uas_data_cnt_company.name  ILIKE '%Аптека 190%' AND uas_data_cnt_company.name  ILIKE '%Красноярск%'
+  - question: Какая средняя цена чека?
+    tables: [uas_cash_cheque]
     query: |
-      SELECT ucci.discont_name, TRUNC(SUM(ucci."result")::DECIMAL, 2)
-      FROM uas_cash_cheque ucc 
-      JOIN uas_cash_cheque_item ucci ON ucci.cheque_id = ucc.cheque_id 
+      SELECT round(avg(result))
+      FROM uas_cash_cheque
+      WHERE result != 0
+  - question: Кто проводил чек с номером c8a0f515-6dc3-44ba-a31e-430637f58712?
+    tables: [uas_data_user, uas_cash_cheque]
+    query: |
+      SELECT uas_data_user
+      FROM uas_data_user
+      JOIN uas_cash_cheque
+      ON uas_cash_cheque.user_id = uas_data_user.user_id 
+      WHERE uas_cash_cheque.cheque_id ='c8a0f515-6dc3-44ba-a31e-430637f58712'
+  - question: Какая аптека проводила чек с номером c8a0f515-6dc3-44ba-a31e-430637f58712? 
+    tables: [uas_data_cnt_company, uas_cash_cheque]
+    query: |
+      SELECT uas_data_cnt_company
+      FROM uas_data_cnt_company
+      JOIN uas_cash_cheque
+      ON uas_cash_cheque.owner_id  = uas_data_cnt_company.cnt_company_id  
+      WHERE uas_cash_cheque.cheque_id = 'c8a0f515-6dc3-44ba-a31e-430637f58712'
+  - question: Сколько у аптеки 122 г Норильска продано Глицина?
+    tables: [uas_data_med_nomenclature, uas_data_cnt_company, uas_cash_cheque_item]
+    query: |
+      SELECT Count(*)
+      FROM uas_cash_cheque 
+      JOIN uas_cash_session_doc ucsd
+      ON ucsd.session_id = uas_cash_cheque.cash_session_id 
+      JOIN uas_cash_cheque_item
+      ON uas_cash_cheque_item.cheque_id = uas_cash_cheque.cheque_id 
+      JOIN uas_data_med_nomenclature udmn
+      ON udmn.nomenclature_id = uas_cash_cheque_item.nomencl_id 
+      JOIN uas_data_cnt_company
+      ON ucsd.owner_id = uas_data_cnt_company.cnt_company_id 
+      WHERE 
+        udmn."name" ILIKE '%глицин%'
+        AND uas_data_cnt_company."name" ILIKE  '%аптека 122%' 
+        AND uas_data_cnt_company."name" ILIKE  '%Норильск%' 
+  - question: Какая сумма скидок была начислена при оплате по Сберу за февраль?
+    tables: [uas_cash_cheque_sum]
+    query: |
+      SELECT trunc(sum(uas_cash_cheque.discunt)::decimal, 2)
+      FROM uas_cash_cheque 
+      JOIN uas_cash_cheque_sum on uas_cash_cheque.cheque_id = uas_cash_cheque_sum.check_id 
+      WHERE uas_cash_cheque_sum.sum_type = 'sber'
+  - question: Какая сумма предоставленных скидок по акции СБП 5% в феврале 2023 года?
+    tables: [uas_cash_cheque_sum]
+    query: |
+      SELECT trunc(sum(uas_cash_cheque_item.discount)::decimal, 2)
+      FROM uas_cash_cheque
+      JOIN uas_cash_cheque_item on uas_cash_cheque_item.cheque_id = uas_cash_cheque.cheque_id 
       WHERE
-        EXTRACT(month FROM ucc.dt_create) = 2
-        AND EXTRACT(year FROM ucc.dt_create) = 2023
-        AND ucci.discont_type IS NOT NULL
-      GROUP BY ucci.discont_type, ucci.discont_name 
-      ORDER BY SUM(ucci."result") DESC
-      LIMIT 1
+        extract(month from uas_cash_cheque.dt_create) = 2
+        AND extract(year from uas_cash_cheque.dt_create) = 2023
+        AND uas_cash_cheque_item.discont_name = 'Акция СБП 5% Массово'
+

@@ -1,11 +1,15 @@
 SQL_PREFIX = """You are an agent designed to interact with a SQL database to respond to a user request.
 Given an input question, create syntactically correct {dialect} queries to run.
 
-Unless the user specifies a specific number of examples they want, always limit your query to no more than {top_k} results.
+Unless the user specifies a specific number of examples they want, always limit your query to no more than {top_k} results (LIMIT {top_k}).
 Never query all columns from a particular table, query only the relevant columns given the question.
-Never consider remote entities unless you are asked to.
+Never review objects that have been removed unless you are asked to.
+Never use ''' '''.
 DO NOT query non-existent columns. Check table information before querying the database!
 DO NOT make any DML statements (INSERT, UPDATE, DELETE, DROP, etc.) on the database.
+
+If the question does not seem related to the information from the database or you messed up, try the following:
+1) look for hints via database hints tool.
 """
 
 
@@ -19,6 +23,7 @@ from db_data_interaction.toolkit import DbDataInteractionToolkit
 
 from utils.color import BOLD, END
 
+import datetime
 
 def get_formatted_prefix_with_additional_info(
         toolkit: DbDataInteractionToolkit, question: str, query_hints_limit: int = 1, prefix: str = SQL_PREFIX
@@ -50,4 +55,9 @@ def get_formatted_prefix_with_additional_info(
 
     # Объединяем информацию о таблицах и примеры запросов в SQL_PREFIX
     result_str = [i for i in [prefix, db_hint_str, table_info_str, query_hints_str] if i is not None]
+    
+    # Добавляем информацию о времени
+    date_today = datetime.date.today()
+    result_str.insert(0, f"Todays date is {date_today}")
+    
     return '\n'.join(result_str)
