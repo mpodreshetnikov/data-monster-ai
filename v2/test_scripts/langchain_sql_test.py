@@ -12,6 +12,8 @@ from db_data_interaction.toolkit import DbDataInteractionToolkit
 from prompts.agent_prompts import SQL_PREFIX, SQL_SUFFIX
 from monitoring.callback import DefaultCallbackHandler
 
+from utils.color import BOLD, END
+
 
 is_debug = True
 url = URL.create(
@@ -46,20 +48,24 @@ while True:
         query_hints = toolkit.get_query_hints(question, 2)
 
         # Формируем строку с подсказками для вывода
-        query_hints_str = ', '.join([f"question: {hint.question}, query: '{hint.query}'" for hint in query_hints])
+        query_hints_str = ''.join([f"{BOLD}Question:{END} {hint.question}\n{BOLD}Query:{END}\n{hint.query}" for hint in query_hints])
 
         # Получаем уникальные таблицы из подсказок и получаем информацию о каждой таблице
         unique_tables = list(set(table for hint in query_hints for table in hint.tables))
         tables_info = ''.join(toolkit.get_table_info(table) for table in unique_tables)
 
         # Формируем строку с информацией о таблицах и примерами похожих запросов для вывода
-        table_info_str = f"Для ответа на запрос специально для вас приготовили таблицу/таблицы, которыми необходимо пользоваться: {unique_tables}. Краткая информация о таблицах: {tables_info}."
-        query_hints_str = f"Примеры наиболее похожих запросов: {query_hints_str}"
+        table_info_str = ('To answer the request, we have prepared a table/tables that you '
+                          'that you need to use especially for you:: {unique_tables}.\n'
+                          'Brief information about tables: {tables_info}\n'
+                          .format(unique_tables=unique_tables, tables_info=tables_info))
+        
+        query_hints_str = 'Examples of similar queries:\n{query_hints_str}'.format(query_hints_str = query_hints_str)
 
         # Объединяем информацию о таблицах и примеры запросов в SQL_PREFIX
         output_str = f"{table_info_str} {query_hints_str}"
         SQL_PREFIX += output_str
-
+        print(SQL_PREFIX)   
         try:
             agent_executor = create_sql_agent(
                 llm=ChatOpenAI(verbose=is_debug),
