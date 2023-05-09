@@ -56,9 +56,9 @@ while True:
 
         # Формируем строку с информацией о таблицах и примерами похожих запросов для вывода
         table_info_str = ('To answer the request, we have prepared a table/tables that you '
-                          'that you need to use especially for you:: {unique_tables}.\n'
-                          'Brief information about tables: {tables_info}\n'
-                          .format(unique_tables=unique_tables, tables_info=tables_info))
+                          'that you need to use especially for you: {BOLD}{unique_tables}{END}.\n'
+                          'Brief {BOLD}information about tables{END}: {tables_info}\n'
+                          .format(unique_tables=unique_tables, tables_info=tables_info, BOLD = BOLD, END = END ))
         
         query_hints_str = 'Examples of similar queries:\n{query_hints_str}'.format(query_hints_str = query_hints_str)
 
