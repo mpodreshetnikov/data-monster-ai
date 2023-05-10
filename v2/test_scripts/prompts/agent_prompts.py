@@ -3,12 +3,13 @@ Given an input question, create syntactically correct {dialect} queries to run.
 
 Unless the user specifies a specific number of examples they want, always limit your query to no more than {top_k} results (LIMIT {top_k}).
 Never query all columns from a particular table, query only the relevant columns given the question.
-Never consider removed and archived entities unless you are asked to.
+Always exlude removed and archived entities unless you are asked to include.
 DO NOT query non-existent columns. Check table information before querying the database!
 DO NOT make any DML statements (INSERT, UPDATE, DELETE, DROP, etc.) on the database.
 
-If the question does not seem related to the information from the database or you messed up, try the following:
-1) look for hints via database hints tool.
+You have access to tools for interacting with the database.
+Only use the below tools. Only use the information returned by the below tools to construct your final answer.
+You MUST double check your query before executing it. If you get an error while executing a query, rewrite the query and try again.
 """
 
 
@@ -18,11 +19,11 @@ Question: {input}
 Thought: {agent_scratchpad}"""
 
 
-from db_data_interaction.toolkit import DbDataInteractionToolkit
+import datetime
 
+from db_data_interaction.toolkit import DbDataInteractionToolkit
 from utils.color import BOLD, END
 
-import datetime
 
 def get_formatted_prefix_with_additional_info(
         toolkit: DbDataInteractionToolkit, question: str, query_hints_limit: int = 1, prefix: str = SQL_PREFIX
@@ -42,7 +43,8 @@ def get_formatted_prefix_with_additional_info(
     unique_tables = list(set(table for hint in query_hints_list for table in hint.tables))
     tables_info = '\n'.join(toolkit.get_table_info(table) for table in unique_tables)
 
-    # Формируем строку с информацией о таблицах и примерами похожих запросов для вывода
+    # Формируем строку с информацией о таблицах, примерами похожих запросов для вывода и другой полезной информацией
+    today_str = f"Today is {datetime.date.today()}"
     db_hint_str =  f'{BOLD}Some hints:{END} {db_hint}' if db_hint else None
     table_info_str = ('\nAlso we have prepared A FEW tables from the database '
                     f'that may be usefull to answer the user\'s question: {BOLD}{unique_tables}{END}.'
@@ -53,10 +55,7 @@ def get_formatted_prefix_with_additional_info(
                     ) if query_hints else None
 
     # Объединяем информацию о таблицах и примеры запросов в SQL_PREFIX
-    result_str = [i for i in [prefix, db_hint_str, table_info_str, query_hints_str] if i is not None]
-    
-    # Добавляем информацию о времени
-    date_today = datetime.date.today()
-    result_str.insert(0, f"Todays date is {date_today}")
-    
+    result_str = [i for i in [
+            today_str, prefix, db_hint_str, table_info_str, query_hints_str
+            ] if i is not None] 
     return '\n'.join(result_str)
