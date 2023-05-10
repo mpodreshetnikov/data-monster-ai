@@ -5,13 +5,14 @@ from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.callbacks import get_openai_callback
 from langchain.agents.mrkl.output_parser import OutputParserException
 from sqlalchemy.engine import URL
-
+from langchain.schema import BaseOutputParser
 import os
 
 from db_data_interaction.toolkit import DbDataInteractionToolkit
 from prompts.agent_prompts import SQL_SUFFIX, get_formatted_prefix_with_additional_info
 from monitoring.callback import DefaultCallbackHandler
 
+from parsers.custom_output_parser import CustomOutputParser
 
 is_debug = True
 url = URL.create(
@@ -48,6 +49,7 @@ while True:
                 verbose=is_debug,
                 prefix=agent_prefix,
                 suffix=SQL_SUFFIX,
+                output_parser = CustomOutputParser()
             )
             response = agent_executor.run(question, callbacks=[DefaultCallbackHandler()])
         except OutputParserException as e:
