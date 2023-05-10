@@ -5,6 +5,7 @@ list:
       SELECT *
       FROM uas_data_user
       WHERE position ILIKE 'Фармацевт' AND is_deleted = 0
+      ORDER BY name
       LIMIT 3
   - question: Сколько сотрудников в Аптеке 190 Красноярск?
     tables: [uas_cash_session_doc, uas_data_user, uas_data_cnt_company]
@@ -16,7 +17,7 @@ list:
       JOIN uas_data_cnt_company
       ON uas_data_cnt_company.cnt_company_id = uas_cash_session_doc.owner_id
       WHERE uas_data_cnt_company.name  ILIKE '%Аптека 190%' AND uas_data_cnt_company.name  ILIKE '%Красноярск%'
-  - question: Какая средняя цена чека?
+  - question: Какая средняя сумма чека за все время?
     tables: [uas_cash_cheque]
     query: |
       SELECT round(avg(result))
@@ -61,7 +62,10 @@ list:
       SELECT trunc(sum(uas_cash_cheque.discunt)::decimal, 2)
       FROM uas_cash_cheque 
       JOIN uas_cash_cheque_sum on uas_cash_cheque.cheque_id = uas_cash_cheque_sum.check_id 
-      WHERE uas_cash_cheque_sum.sum_type = 'sber'
+      WHERE 
+        extract(month from uas_cash_cheque.dt_create) = 2
+        AND extract(year from uas_cash_cheque.dt_create) = 2023
+        AND uas_cash_cheque_sum.sum_type = 'sber'
   - question: Какая сумма предоставленных скидок по акции СБП 5% в феврале 2023 года?
     tables: [uas_cash_cheque_sum]
     query: |
