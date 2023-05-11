@@ -24,7 +24,7 @@ url = URL.create(
     database="dwh_uas2",
 )
 schema = "dwh_uas"
-openai_api_key = "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"
+openai_api_key = "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"
 tables_to_use = ["uas_cash_session_doc", "uas_cash_cheque", "uas_cash_cheque_item", "uas_cash_cheque_sum", "uas_data_med_nomenclature", "uas_data_user", "uas_data_cnt_company"]
 
 os.environ["OPENAI_API_KEY"] = openai_api_key

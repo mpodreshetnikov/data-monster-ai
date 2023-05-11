@@ -56,4 +56,19 @@ list:
         udmn."name" ILIKE '%глицин%'
         AND uas_data_cnt_company."name" ILIKE  '%аптека 122%' 
         AND uas_data_cnt_company."name" ILIKE  '%Норильск%' 
-
+  - question: Сколько ежемесячно продаётся Нафтодерила
+    query: |
+      SELECT
+        DATE_TRUNC('month', uas_cash_cheque.dt_create) AS month,
+        SUM(uas_cash_cheque_item.qty)
+      FROM
+        uas_cash_cheque
+        JOIN uas_cash_cheque_item ON uas_cash_cheque.cheque_id = uas_cash_cheque_item.cheque_id
+        JOIN uas_data_med_nomenclature ON uas_cash_cheque_item.nomencl_id = uas_data_med_nomenclature.nomenclature_id     
+      WHERE
+        uas_data_med_nomenclature."name" ILIKE '%Нафтодерил%'
+      GROUP BY
+        month
+      ORDER BY
+        month DESC
+      LIMIT 10
