@@ -56,24 +56,4 @@ list:
         udmn."name" ILIKE '%глицин%'
         AND uas_data_cnt_company."name" ILIKE  '%аптека 122%' 
         AND uas_data_cnt_company."name" ILIKE  '%Норильск%' 
-  - question: Какая сумма скидок была начислена при оплате по Сберу за февраль?
-    tables: [uas_cash_cheque_sum]
-    query: |
-      SELECT trunc(sum(uas_cash_cheque.discunt)::decimal, 2)
-      FROM uas_cash_cheque 
-      JOIN uas_cash_cheque_sum on uas_cash_cheque.cheque_id = uas_cash_cheque_sum.check_id 
-      WHERE 
-        extract(month from uas_cash_cheque.dt_create) = 2
-        AND extract(year from uas_cash_cheque.dt_create) = 2023
-        AND uas_cash_cheque_sum.sum_type = 'sber'
-  - question: Какая сумма предоставленных скидок по акции СБП 5% в феврале 2023 года?
-    tables: [uas_cash_cheque_sum]
-    query: |
-      SELECT trunc(sum(uas_cash_cheque_item.discount)::decimal, 2)
-      FROM uas_cash_cheque
-      JOIN uas_cash_cheque_item on uas_cash_cheque_item.cheque_id = uas_cash_cheque.cheque_id 
-      WHERE
-        extract(month from uas_cash_cheque.dt_create) = 2
-        AND extract(year from uas_cash_cheque.dt_create) = 2023
-        AND uas_cash_cheque_item.discont_name = 'Акция СБП 5% Массово'
 
