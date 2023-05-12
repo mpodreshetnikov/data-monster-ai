@@ -36,8 +36,9 @@ include_tables = config.get("db", "tables_to_use").split(",")
 db = SQLDatabase.from_uri(url, schema=schema, include_tables=include_tables)
 
 openai_api_key = config.get("openai", "api_key")
+temperature = config.getfloat("openai", "temperature", fallback=0.7)
 os.environ["OPENAI_API_KEY"] = openai_api_key
-llm = ChatOpenAI(verbose=is_debug)
+llm = ChatOpenAI(verbose=is_debug, temperature=temperature)
 
 db_hints_doc_path = config.get("hints", "db_hints_doc_path")
 sql_query_examples_path = config.get("hints", "sql_query_examples_path")

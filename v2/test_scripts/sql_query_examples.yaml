@@ -57,6 +57,7 @@ list:
         AND uas_data_cnt_company."name" ILIKE  '%аптека 122%' 
         AND uas_data_cnt_company."name" ILIKE  '%Норильск%' 
   - question: Сколько ежемесячно продаётся Нафтодерила
+    tables: [uas_cash_cheque, uas_cash_cheque_item, uas_data_med_nomenclature]
     query: |
       SELECT
         DATE_TRUNC('month', uas_cash_cheque.dt_create) AS month,
