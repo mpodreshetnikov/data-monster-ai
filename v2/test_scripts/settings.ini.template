@@ -1,5 +1,6 @@
-[modes]
+[debug]
 is_debug = True
+prompt_log_path = v2/test_scripts/prompt_log.txt
 
 [db]
 drivername = postgresql
@@ -14,7 +15,7 @@ tables_to_use = table1,table2,table3,table4,table5
 [openai]
 api_key = sk-qwerty12345
 
-[paths]
+[hints]
 db_hints_doc_path = v2/test_scripts/db_hints.txt
 sql_query_examples_path = v2/test_scripts/sql_query_examples.yaml
 query_hints_limit = 3

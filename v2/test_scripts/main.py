@@ -48,7 +48,7 @@ toolkit = DbDataInteractionToolkit(
     db_hints_doc_path=db_hints_doc_path, sql_query_examples_path=sql_query_examples_path)
 toolkit.build()
 
-output_parser = CustomOutputParser(retrying_llm=llm, is_debug=is_debug)
+output_parser = CustomOutputParser(is_debug=is_debug)
 # TODO pass full prompt to output parser!!!
 
 while True:
@@ -64,7 +64,8 @@ while True:
                 verbose=is_debug,
                 prefix=SQL_PREFIX,
                 suffix=agent_suffix,
-                output_parser=output_parser
+                output_parser=output_parser,
+                handle_parsing_errors=True,
             )
             response = agent_executor.run(question,
                                           callbacks=[DefaultCallbackHandler(log_path=prompt_log_path)])
