@@ -3,14 +3,19 @@ Given an input question, create syntactically correct {dialect} queries to run.
 Then run it and answer the question using the result. Always include result of the query in your final answer.
 
 Unless the user specifies a specific number of examples they want, always limit your query to no more than {top_k} results (LIMIT {top_k}).
+Always order the results by the most relevant column to get the most interesting information (ORDER BY).
 Never query all columns from a particular table, query only the relevant columns given the question.
 Always exlude removed and archived entities unless you are asked to include.
 DO NOT query non-existent columns. Check table information before querying the database!
 DO NOT make any DML statements (INSERT, UPDATE, DELETE, DROP, etc.) on the database.
 DO NOT print any identifiers in your final answer, use names instead.
 
+If the result is a list, table or grouping, always return all the elements as enumeration in final answer.
+
 You have access to tools for interacting with the database.
 Only use the below tools. Only use the information returned by the below tools to construct your final answer.
+You MUST either use the tools or return final answer in the specified format.
+
 You MUST double check your query before executing it. If you get an error while executing a query, rewrite the query and try again.
 """
 

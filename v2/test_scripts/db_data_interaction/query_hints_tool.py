@@ -5,7 +5,6 @@ import yaml
 from langchain.agents.agent_toolkits.base import BaseToolkit
 from langchain.vectorstores import Chroma, VectorStore
 from langchain.embeddings.base import Embeddings
-from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.docstore.document import Document
 from langchain.tools import BaseTool
 from langchain.tools.json.tool import JsonSpec

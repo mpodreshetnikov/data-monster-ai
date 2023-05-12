@@ -17,3 +17,4 @@ api_key = sk-qwerty12345
 [paths]
 db_hints_doc_path = v2/test_scripts/db_hints.txt
 sql_query_examples_path = v2/test_scripts/sql_query_examples.yaml
+query_hints_limit = 3

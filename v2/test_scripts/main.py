@@ -37,30 +37,34 @@ db = SQLDatabase.from_uri(url, schema=schema, include_tables=include_tables)
 
 openai_api_key = config.get("openai", "api_key")
 os.environ["OPENAI_API_KEY"] = openai_api_key
+llm = ChatOpenAI(verbose=is_debug)
 
 db_hints_doc_path = config.get("hints", "db_hints_doc_path")
 sql_query_examples_path = config.get("hints", "sql_query_examples_path")
+query_hints_limit = config.getint("hints", "query_hints_limit", fallback=0)
 
 toolkit = DbDataInteractionToolkit(
     db=db, llm=ChatOpenAI(verbose=is_debug), embeddings=OpenAIEmbeddings(),
     db_hints_doc_path=db_hints_doc_path, sql_query_examples_path=sql_query_examples_path)
 toolkit.build()
 
+output_parser = CustomOutputParser(retrying_llm=llm, is_debug=is_debug)
+# TODO pass full prompt to output parser!!!
 
 while True:
     print("Задай вопрос: ")
     question = str(input())
     with get_openai_callback() as cb:
-        hints_str = get_formatted_hints(toolkit, question, query_hints_limit=3)
+        hints_str = get_formatted_hints(toolkit, question, query_hints_limit)
         agent_suffix = f"{hints_str}\n{SQL_SUFFIX}"
         try:
             agent_executor = create_sql_agent(
-                llm=ChatOpenAI(verbose=is_debug),
+                llm=llm,
                 toolkit=toolkit,
                 verbose=is_debug,
                 prefix=SQL_PREFIX,
                 suffix=agent_suffix,
-                output_parser = CustomOutputParser()
+                output_parser=output_parser
             )
             response = agent_executor.run(question,
                                           callbacks=[DefaultCallbackHandler(log_path=prompt_log_path)])

@@ -54,7 +54,7 @@ class DbDataInteractionToolkit(SQLDatabaseToolkitModified, BaseToolkit):
             return None
         
         answer = tool.run(query)
-        if any((phrase in answer) for phrase in ["не знаю", "не могу", "не владею", "не имею"]):
+        if any((phrase in answer) for phrase in ["не знаю", "не могу", "не владею", "не имею", "невозможно"]):
             return None
         
         return answer
