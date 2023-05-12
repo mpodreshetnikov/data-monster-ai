@@ -27,8 +27,8 @@ from db_data_interaction.toolkit import DbDataInteractionToolkit
 from utils.color import BOLD, END
 
 
-def get_formatted_prefix_with_additional_info(
-        toolkit: DbDataInteractionToolkit, question: str, query_hints_limit: int = 1, prefix: str = SQL_PREFIX
+def get_formatted_hints(
+        toolkit: DbDataInteractionToolkit, question: str, query_hints_limit: int = 1
 ):
     # Получаем подсказку для базы данных
     db_hint = toolkit.get_db_hint(question)
@@ -58,6 +58,6 @@ def get_formatted_prefix_with_additional_info(
 
     # Объединяем информацию о таблицах и примеры запросов в SQL_PREFIX
     result_str = [i for i in [
-            today_str, prefix, db_hint_str, table_info_str, query_hints_str
+            today_str, db_hint_str, table_info_str, query_hints_str
             ] if i is not None] 
     return '\n'.join(result_str)
