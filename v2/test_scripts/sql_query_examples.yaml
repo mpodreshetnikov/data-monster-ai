@@ -73,13 +73,13 @@ list:
       ORDER BY
         month DESC
       LIMIT 10
-  - question: Выведи все типы акций/скидок
+  - question: Выведи все типы акций
     tables: [uas_cash_cheque_item]
     query: |
       SELECT distinct  uas_cash_cheque_item.discont_name
       FROM uas_cash_cheque_item
       WHERE uas_cash_cheque_item.discont_name notnull
-  - question: Выведи все типы акций/скидок
+  - question: Выведи все типы оплаты 
     tables: [uas_cash_cheque_sum]
     query: |
       SELECT distinct sum_type
