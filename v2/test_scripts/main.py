@@ -60,7 +60,7 @@ while True:
             is_debug=is_debug,
             last_prompt_saver_callback_handler=last_prompt_saver)
         hints_str = get_formatted_hints(toolkit, question, query_hints_limit)
-        agent_suffix = f"{hints_str}\n{SQL_SUFFIX}"
+        agent_suffix = f"{hints_str}\n\n{SQL_SUFFIX}"
         try:
             agent_executor = create_sql_agent(
                 llm=llm,
@@ -69,9 +69,6 @@ while True:
                 prefix=SQL_PREFIX,
                 suffix=agent_suffix,
                 output_parser=output_parser,
-                agent_executor_kwargs={
-                    # "handle_parsing_errors": True,
-                },
             )
             response = agent_executor.run(question,
                                           callbacks=[

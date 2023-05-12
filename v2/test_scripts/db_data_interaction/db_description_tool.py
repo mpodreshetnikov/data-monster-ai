@@ -97,33 +97,49 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
 
                 create_table = str(CreateTable(table).compile(self.db._engine))
                 table_info = f"{create_table.rstrip()}"
-                has_extra_info = (
-                    self.db._indexes_in_table_info or self.db._sample_rows_in_table_info
-                )
 
                 # add column comments
                 for column in table.columns:
                     if column.comment:
-                        f_pattern = r"(" + column.name + r"[^,\n]*)(,?\n?)"
+                        f_pattern = r"(\s" + column.name + r"\s[^,\n]*)(,?\n?)"
                         s_pattern = r"\1 COMMENT '" + column.comment + r"'\2"
                         table_info = re.sub(f_pattern, s_pattern, table_info, count=1)
-            '''
-                if has_extra_info:
-                    table_info += "\n\n/*"
-                if self.db._indexes_in_table_info:
-                    table_info += f"\n{self.db._get_table_indexes(table)}\n"
-                if self.db._sample_rows_in_table_info:
-                    table_info += f"\n{self.db._get_sample_rows(table)}\n"
-                if has_extra_info:
-                    table_info += "*/"
                 tables.append(table_info)
+
+                # has_extra_info = (
+                #     self.db._indexes_in_table_info or self.db._sample_rows_in_table_info
+                # )
+                # if has_extra_info:
+                #     table_info += "\n\n/*"
+                # if self.db._indexes_in_table_info:
+                #     table_info += f"\n{self.db._get_table_indexes(table)}\n"
+                # if self.db._sample_rows_in_table_info:
+                #     table_info += f"\n{self.db._get_sample_rows(table)}\n"
+                # if has_extra_info:
+                #     table_info += "*/"
+
             final_str = "\n\n".join(tables)
-            '''
-            return table_info
+            return final_str
         except ValueError as e:
             """Format the error message"""
             return f"Error: {e}"
- 
+
+
+class LightweightQuerySQLDataBaseTool(QuerySQLDataBaseTool):
+    """Tool for querying SQL databases. Errors are returned simplified."""
+
+    def _run(
+        self,
+        query: str,
+        tool_input: str = "",
+        run_manager: Optional[CallbackManagerForToolRun] = None,
+    ) -> str:
+        result: str = super()._run(query, run_manager)
+        if "Error:" in result:
+            simplified_error_text = result.split("[SQL:")[0].rstrip()
+            return simplified_error_text
+        return result
+
 
 class SQLDatabaseToolkitModified(BaseToolkit):
     """Toolkit for interacting with SQL databases."""
@@ -144,8 +160,8 @@ class SQLDatabaseToolkitModified(BaseToolkit):
     def get_tools(self) -> list[BaseTool]:
         """Get the tools in the toolkit."""
         return [
-            QuerySQLDataBaseTool(db=self.db),
+            LightweightQuerySQLDataBaseTool(db=self.db),
             InfoSQLDatabaseWithCommentsTool(db=self.db),
             ListSQLDatabaseWithCommentsTool(db=self.db),
-            QueryCheckerTool(db=self.db, llm=self.llm),
+            # QueryCheckerTool(db=self.db, llm=self.llm),
         ]
