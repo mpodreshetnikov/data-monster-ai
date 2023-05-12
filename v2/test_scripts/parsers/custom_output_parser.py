@@ -1,14 +1,16 @@
-from pydantic import Field
+from uuid import UUID
+from pydantic import Field, PrivateAttr
 
 import re
-from typing import Union
+from typing import Any, Dict, List, Optional, Union
 
 from langchain.base_language import BaseLanguageModel
 from langchain.agents.agent import AgentOutputParser
 from langchain.agents.mrkl.prompt import FORMAT_INSTRUCTIONS
 from langchain.output_parsers.retry import RetryOutputParser
 from langchain.prompts.base import StringPromptValue
-from langchain.schema import AgentAction, AgentFinish, OutputParserException
+from langchain.schema import AgentAction, AgentFinish, LLMResult, OutputParserException
+from langchain.callbacks.base import BaseCallbackHandler
 
 
 FINAL_ANSWER_ACTIONS = [
@@ -18,24 +20,36 @@ FINAL_ANSWER_ACTIONS = [
     ]
 
 
-class CustomOutputParser(AgentOutputParser):
+class LastPromptSaverCallbackHandler(BaseCallbackHandler):
+    _last_prompt: str = None
+    
+    def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], *, run_id: UUID, parent_run_id: UUID | None = None, **kwargs: Any) -> Any:
+        prompt = prompts[0]
+        self._last_prompt = prompt
+        return prompt
+
+
+class CustomOutputParserWithCallbackHandling(AgentOutputParser, BaseCallbackHandler):
     is_debug: bool = Field(default=False)
     retrying_llm: BaseLanguageModel = Field(default=None)
+    last_prompt_saver_callback_handler: LastPromptSaverCallbackHandler = Field()
 
     def get_format_instructions(self) -> str:
         return FORMAT_INSTRUCTIONS
     
     def parse(self, text: str) -> Union[AgentAction, AgentFinish]:
-        format_instructions = self.get_format_instructions()
         inner_parser = __InnerCustomOutputParser__(is_debug=self.is_debug)
-
         if self.retrying_llm:
             retry_parser = RetryOutputParser.from_llm(
                 llm=self.retrying_llm,
                 parser=inner_parser)
-            return retry_parser.parse_with_prompt(text, StringPromptValue(text=format_instructions))
+            prompt = self.last_prompt_saver_callback_handler._last_prompt
+            return retry_parser.parse_with_prompt(text, StringPromptValue(text=prompt))
         else:
             return inner_parser.parse(text)
+        
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class __InnerCustomOutputParser__(AgentOutputParser):

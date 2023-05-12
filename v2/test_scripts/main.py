@@ -12,7 +12,7 @@ from db_data_interaction.toolkit import DbDataInteractionToolkit
 from prompts.agent_prompts import SQL_PREFIX, SQL_SUFFIX, get_formatted_hints
 from monitoring.callback import DefaultCallbackHandler
 
-from parsers.custom_output_parser import CustomOutputParser
+from parsers.custom_output_parser import CustomOutputParserWithCallbackHandling, LastPromptSaverCallbackHandler
 
 
 config = configparser.ConfigParser()
@@ -44,17 +44,20 @@ sql_query_examples_path = config.get("hints", "sql_query_examples_path")
 query_hints_limit = config.getint("hints", "query_hints_limit", fallback=0)
 
 toolkit = DbDataInteractionToolkit(
-    db=db, llm=ChatOpenAI(verbose=is_debug), embeddings=OpenAIEmbeddings(),
+    db=db, llm=llm, embeddings=OpenAIEmbeddings(),
     db_hints_doc_path=db_hints_doc_path, sql_query_examples_path=sql_query_examples_path)
 toolkit.build()
 
-output_parser = CustomOutputParser(is_debug=is_debug)
-# TODO pass full prompt to output parser!!!
 
 while True:
     print("Задай вопрос: ")
     question = str(input())
     with get_openai_callback() as cb:
+        last_prompt_saver = LastPromptSaverCallbackHandler()
+        output_parser = CustomOutputParserWithCallbackHandling(
+            retrying_llm=llm,
+            is_debug=is_debug,
+            last_prompt_saver_callback_handler=last_prompt_saver)
         hints_str = get_formatted_hints(toolkit, question, query_hints_limit)
         agent_suffix = f"{hints_str}\n{SQL_SUFFIX}"
         try:
@@ -65,10 +68,15 @@ while True:
                 prefix=SQL_PREFIX,
                 suffix=agent_suffix,
                 output_parser=output_parser,
-                handle_parsing_errors=True,
+                agent_executor_kwargs={
+                    # "handle_parsing_errors": True,
+                },
             )
             response = agent_executor.run(question,
-                                          callbacks=[DefaultCallbackHandler(log_path=prompt_log_path)])
+                                          callbacks=[
+                                              DefaultCallbackHandler(log_path=prompt_log_path),
+                                              last_prompt_saver,
+                                            ])
         except OutputParserException as e:
             print(f"Не удается распознать результат работы ИИ: {e}")
             continue

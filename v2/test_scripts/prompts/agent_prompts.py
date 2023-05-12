@@ -8,7 +8,7 @@ Never query all columns from a particular table, query only the relevant columns
 Always exlude removed and archived entities unless you are asked to include.
 DO NOT query non-existent columns. Check table information before querying the database!
 DO NOT make any DML statements (INSERT, UPDATE, DELETE, DROP, etc.) on the database.
-DO NOT print any identifiers in your final answer, use names instead.
+DO NOT print any identifiers (*_id) in your final answer, use names instead.
 
 If the result is a list, table or grouping, always return all the elements as enumeration in final answer.
 
@@ -46,7 +46,7 @@ def get_formatted_hints(
                     [f"{BOLD}Question:{END} {hint.question}\n{BOLD}Query:{END}\n{hint.query}" for hint in query_hints_list]
                     ) if len(query_hints_list) > 0 else None
 
-    # Получаем уникальные таблицы из подсказок и получаем информацию о каждой таблице
+    # Получаем уникальные таблицы из подсказок и получаем информацию о каждой таблиц
     unique_tables = list(set(table for hint in query_hints_list for table in hint.tables))
     tables_info = '\n'.join(toolkit.get_table_info(table) for table in unique_tables)
 
