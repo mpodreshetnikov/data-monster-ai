@@ -57,6 +57,7 @@ list:
         AND uas_data_cnt_company."name" ILIKE  '%аптека 122%' 
         AND uas_data_cnt_company."name" ILIKE  '%Норильск%' 
   - question: Сколько ежемесячно продаётся Нафтодерила
+    tables: [uas_data_med_nomenclature, uas_cash_cheque, uas_cash_cheque_item]
     query: |
       SELECT
         DATE_TRUNC('month', uas_cash_cheque.dt_create) AS month,
@@ -72,3 +73,15 @@ list:
       ORDER BY
         month DESC
       LIMIT 10
+  - question: Выведи все типы акций/скидок
+    tables: [uas_cash_cheque_item]
+    query: |
+      SELECT distinct  uas_cash_cheque_item.discont_name
+      FROM uas_cash_cheque_item
+      WHERE uas_cash_cheque_item.discont_name notnull
+  - question: Выведи все типы акций/скидок
+    tables: [uas_cash_cheque_sum]
+    query: |
+      SELECT distinct sum_type
+      FROM uas_cash_cheque_sum
+      WHERE sum_type notnull
