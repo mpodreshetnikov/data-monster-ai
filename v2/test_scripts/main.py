@@ -1,3 +1,5 @@
+import os, configparser
+
 from langchain.agents import create_sql_agent
 from langchain.sql_database import SQLDatabase
 from langchain.chat_models import ChatOpenAI
@@ -5,8 +7,6 @@ from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.callbacks import get_openai_callback
 from langchain.agents.mrkl.output_parser import OutputParserException
 from sqlalchemy.engine import URL
-from langchain.schema import BaseOutputParser
-import os
 
 from db_data_interaction.toolkit import DbDataInteractionToolkit
 from prompts.agent_prompts import SQL_SUFFIX, get_formatted_prefix_with_additional_info
@@ -14,25 +14,34 @@ from monitoring.callback import DefaultCallbackHandler
 
 from parsers.custom_output_parser import CustomOutputParser
 
-is_debug = True
-url = URL.create(
-    "postgresql",
-    username="gpt_bi_user",
-    password="L4swy64n9fJkNt",  
-    host="62.109.28.9",
-    port="2401",
-    database="dwh_uas2",
-)
-schema = "dwh_uas"
-openai_api_key = "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"
-tables_to_use = ["uas_cash_session_doc", "uas_cash_cheque", "uas_cash_cheque_item", "uas_cash_cheque_sum", "uas_data_med_nomenclature", "uas_data_user", "uas_data_cnt_company"]
 
+config = configparser.ConfigParser()
+config.read("v2/test_scripts/settings.ini")
+
+
+is_debug = config.getboolean("modes", "is_debug", fallback=False)
+
+url = URL.create(
+    drivername=config.get("db", "drivername", fallback="postgresql"),
+    username=config.get("db", "username"),
+    password=config.get("db", "password"),  
+    host=config.get("db", "host"),
+    port=config.get("db", "port"),
+    database=config.get("db", "database"),
+)
+schema = config.get("db", "schema")
+include_tables = config.get("db", "tables_to_use").split(",")
+db = SQLDatabase.from_uri(url, schema=schema, include_tables=include_tables)
+
+openai_api_key = config.get("openai", "api_key")
 os.environ["OPENAI_API_KEY"] = openai_api_key
 
-db = SQLDatabase.from_uri(url, schema=schema, include_tables=tables_to_use)
+db_hints_doc_path = config.get("paths", "db_hints_doc_path")
+sql_query_examples_path = config.get("paths", "sql_query_examples_path")
+
 toolkit = DbDataInteractionToolkit(
     db=db, llm=ChatOpenAI(verbose=is_debug), embeddings=OpenAIEmbeddings(),
-    db_hints_doc_path="v2/test_scripts/db_hints.txt", sql_query_examples_path = "v2/test_scripts/sql_query_examples.yaml")
+    db_hints_doc_path=db_hints_doc_path, sql_query_examples_path=sql_query_examples_path)
 toolkit.build()
 
 
@@ -57,4 +66,3 @@ while True:
             continue
         print(f"Response: {response}")
         print(cb)
-
