@@ -1,3 +1,6 @@
+from langchain import PromptTemplate
+
+
 SQL_PREFIX = """You are an agent designed to interact with a SQL database to respond to a user request.
 Given an input question, create syntactically correct {dialect} queries to run.
 Then run it and answer the question using the result. Always include result of the query in your final answer.
@@ -19,11 +22,27 @@ You MUST either use the tools or return final answer in the specified format.
 You MUST double check your query before executing it. If you get an error while executing a query, rewrite the query and try again.
 """
 
-
 SQL_SUFFIX = """Begin!
 
 Question: {input}
 Thought: {agent_scratchpad}"""
+
+__RETRY_WITH_ERROR__ = """Prompt
+---
+{prompt}
+---
+Bad Completion
+---
+{completion}
+---
+Above, the Bad Completion did not satisfy the constraints given in the Prompt.
+Details: {error}
+Please forget the Bad Completion and rewrite the new one, follow the format: Thought, then Action/Action Input or Final answer
+---
+New Good Completion
+---
+"""
+RETRY_WITH_ERROR_PROMPT = PromptTemplate.from_template(__RETRY_WITH_ERROR__)
 
 
 import datetime

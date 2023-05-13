@@ -8,10 +8,12 @@ from typing import Any, Dict, List, Optional, Union
 from langchain.base_language import BaseLanguageModel
 from langchain.agents.agent import AgentOutputParser
 from langchain.agents.mrkl.prompt import FORMAT_INSTRUCTIONS
-from langchain.output_parsers.retry import RetryWithErrorOutputParser, NAIVE_RETRY_WITH_ERROR_PROMPT
+from langchain.output_parsers.retry import RetryWithErrorOutputParser
 from langchain.prompts.base import StringPromptValue
 from langchain.schema import AgentAction, AgentFinish, OutputParserException
 from langchain.callbacks.base import BaseCallbackHandler
+
+from prompts.agent_prompts import RETRY_WITH_ERROR_PROMPT
 
 
 FINAL_ANSWER_ACTIONS = [
@@ -42,7 +44,7 @@ class CustomOutputParserWithCallbackHandling(AgentOutputParser, BaseCallbackHand
     def parse(self, text: str) -> Union[AgentAction, AgentFinish]:
         inner_parser = __InnerCustomOutputParser__(is_debug=self.is_debug)
         if self.retrying_llm and self.retrying_last_prompt_saver:
-            llm_chain = LLMChain(llm=self.retrying_llm, prompt=NAIVE_RETRY_WITH_ERROR_PROMPT, callbacks=self.retrying_chain_callbacks)
+            llm_chain = LLMChain(llm=self.retrying_llm, prompt=RETRY_WITH_ERROR_PROMPT, callbacks=self.retrying_chain_callbacks)
             retry_parser = RetryWithErrorOutputParser(parser=inner_parser, retry_chain=llm_chain)
             prompt = self.retrying_last_prompt_saver._last_prompt
             if prompt:

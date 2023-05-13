@@ -6,6 +6,7 @@ from langchain.chat_models import ChatOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.callbacks import get_openai_callback
 from langchain.agents.mrkl.output_parser import OutputParserException
+from openai import InvalidRequestError
 from sqlalchemy.engine import URL
 
 from db_data_interaction.toolkit import DbDataInteractionToolkit
@@ -71,6 +72,7 @@ while True:
                 prefix=SQL_PREFIX,
                 suffix=agent_suffix,
                 output_parser=output_parser,
+                max_iterations=5,
             )
             response = agent_executor.run(question,
                                           callbacks=[
@@ -79,6 +81,9 @@ while True:
                                             ])
         except OutputParserException as e:
             print(f"Не удается распознать результат работы ИИ: {e}")
+            continue
+        except InvalidRequestError as e:
+            print(f"Ошибка при запросе к OpenAI: {e}")
             continue
         print(f"Response: {response}")
         print(cb)
