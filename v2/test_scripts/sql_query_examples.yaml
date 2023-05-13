@@ -7,16 +7,6 @@ list:
       WHERE position ILIKE 'Фармацевт' AND is_deleted = 0
       ORDER BY name
       LIMIT 3
-  - question: Сколько сотрудников в Аптеке 190 Красноярск?
-    tables: [uas_cash_session_doc, uas_data_user, uas_data_cnt_company]
-    query: |
-      SELECT count(*)
-      FROM uas_cash_session_doc
-      JOIN uas_data_user
-      ON uas_data_user.user_id = uas_cash_session_doc.user_id
-      JOIN uas_data_cnt_company
-      ON uas_data_cnt_company.cnt_company_id = uas_cash_session_doc.owner_id
-      WHERE uas_data_cnt_company.name  ILIKE '%Аптека 190%' AND uas_data_cnt_company.name  ILIKE '%Красноярск%'
   - question: Какая средняя сумма чека за все время?
     tables: [uas_cash_cheque]
     query: |
@@ -73,15 +63,11 @@ list:
       ORDER BY
         month DESC
       LIMIT 10
-  - question: Выведи все типы акций
-    tables: [uas_cash_cheque_item]
-    query: |
-      SELECT distinct  uas_cash_cheque_item.discont_name
-      FROM uas_cash_cheque_item
-      WHERE uas_cash_cheque_item.discont_name notnull
-  - question: Выведи все типы оплаты 
+  - question: Выведи все возможные типы оплаты и типы скидок. 
     tables: [uas_cash_cheque_sum]
     query: |
-      SELECT distinct sum_type
-      FROM uas_cash_cheque_sum
-      WHERE sum_type notnull
+      SELECT distinct sum_type, discont_name
+      FROM uas_cash_cheque
+      JOIN uas_cash_cheque_item on uas_cash_cheque_item.cheque_id = uas_cash_cheque.cheque_id
+      JOIN uas_cash_cheque_sum on uas_cash_cheque_sum.check_id = uas_cash_cheque.cheque_id
+      WHERE sum_type notnull and discont_name notnull
