@@ -4,7 +4,7 @@ from langchain.callbacks.base import BaseCallbackHandler
 from pydantic import Field
 
 
-class DefaultCallbackHandler(BaseCallbackHandler):
+class LogLLMPromptCallbackHandler(BaseCallbackHandler):
     log_path: str = Field()
 
     def __init__(self, log_path: str) -> None:
@@ -14,6 +14,6 @@ class DefaultCallbackHandler(BaseCallbackHandler):
         prompt = prompts[0]
         if self.log_path:
             with open(self.log_path, "a", encoding="utf-8") as f:
-                f.write("\n------------------------------------\n")
+                f.write(f"\n------------------{parent_run_id}------------------\n")
                 f.write(prompt)
         return prompt

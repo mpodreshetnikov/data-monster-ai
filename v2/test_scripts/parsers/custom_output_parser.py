@@ -1,4 +1,5 @@
 from uuid import UUID
+from langchain import LLMChain
 from pydantic import Field, PrivateAttr
 
 import re
@@ -7,7 +8,7 @@ from typing import Any, Dict, List, Optional, Union
 from langchain.base_language import BaseLanguageModel
 from langchain.agents.agent import AgentOutputParser
 from langchain.agents.mrkl.prompt import FORMAT_INSTRUCTIONS
-from langchain.output_parsers.retry import RetryWithErrorOutputParser
+from langchain.output_parsers.retry import RetryWithErrorOutputParser, NAIVE_RETRY_WITH_ERROR_PROMPT
 from langchain.prompts.base import StringPromptValue
 from langchain.schema import AgentAction, AgentFinish, OutputParserException
 from langchain.callbacks.base import BaseCallbackHandler
@@ -32,21 +33,21 @@ class LastPromptSaverCallbackHandler(BaseCallbackHandler):
 class CustomOutputParserWithCallbackHandling(AgentOutputParser, BaseCallbackHandler):
     is_debug: bool = Field(default=False)
     retrying_llm: BaseLanguageModel = Field(default=None)
-    last_prompt_saver_callback_handler: LastPromptSaverCallbackHandler = Field()
+    retrying_last_prompt_saver: LastPromptSaverCallbackHandler = Field()
+    retrying_chain_callbacks: list[BaseCallbackHandler] = Field(default=[])
 
     def get_format_instructions(self) -> str:
         return FORMAT_INSTRUCTIONS
     
     def parse(self, text: str) -> Union[AgentAction, AgentFinish]:
         inner_parser = __InnerCustomOutputParser__(is_debug=self.is_debug)
-        if self.retrying_llm:
-            retry_parser = RetryWithErrorOutputParser.from_llm(
-                llm=self.retrying_llm,
-                parser=inner_parser)
-            prompt = self.last_prompt_saver_callback_handler._last_prompt
-            return retry_parser.parse_with_prompt(text, StringPromptValue(text=prompt))
-        else:
-            return inner_parser.parse(text)
+        if self.retrying_llm and self.retrying_last_prompt_saver:
+            llm_chain = LLMChain(llm=self.retrying_llm, prompt=NAIVE_RETRY_WITH_ERROR_PROMPT, callbacks=self.retrying_chain_callbacks)
+            retry_parser = RetryWithErrorOutputParser(parser=inner_parser, retry_chain=llm_chain)
+            prompt = self.retrying_last_prompt_saver._last_prompt
+            if prompt:
+                return retry_parser.parse_with_prompt(text, StringPromptValue(text=prompt))
+        return inner_parser.parse(text)
         
     class Config:
         arbitrary_types_allowed = True
@@ -67,7 +68,7 @@ class __InnerCustomOutputParser__(AgentOutputParser):
         )
         match = re.search(regex, text, re.DOTALL)
         if not match:
-            if "Action: None" in text:
+            if "Action: None" in text or "Action: N/A" in text:
                 error_str = "Action was None, but you must specify an action from the list."
             else:
                 error_str = "Action and Action Input were not provided."

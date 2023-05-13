@@ -10,7 +10,7 @@ from sqlalchemy.engine import URL
 
 from db_data_interaction.toolkit import DbDataInteractionToolkit
 from prompts.agent_prompts import SQL_PREFIX, SQL_SUFFIX, get_formatted_hints
-from monitoring.callback import DefaultCallbackHandler
+from monitoring.callback import LogLLMPromptCallbackHandler
 
 from parsers.custom_output_parser import CustomOutputParserWithCallbackHandling, LastPromptSaverCallbackHandler
 
@@ -54,11 +54,13 @@ while True:
     print("Задай вопрос: ")
     question = str(input())
     with get_openai_callback() as cb:
+        prompt_logger = LogLLMPromptCallbackHandler(log_path=prompt_log_path)
         last_prompt_saver = LastPromptSaverCallbackHandler()
         output_parser = CustomOutputParserWithCallbackHandling(
             retrying_llm=llm,
             is_debug=is_debug,
-            last_prompt_saver_callback_handler=last_prompt_saver)
+            retrying_last_prompt_saver=last_prompt_saver,
+            retrying_chain_callbacks=[prompt_logger],)
         hints_str = get_formatted_hints(toolkit, question, query_hints_limit)
         agent_suffix = f"{hints_str}\n\n{SQL_SUFFIX}"
         try:
@@ -72,7 +74,7 @@ while True:
             )
             response = agent_executor.run(question,
                                           callbacks=[
-                                              DefaultCallbackHandler(log_path=prompt_log_path),
+                                              prompt_logger,
                                               last_prompt_saver,
                                             ])
         except OutputParserException as e:
