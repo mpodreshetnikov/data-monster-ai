@@ -6,14 +6,18 @@ from langchain.chat_models import ChatOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.callbacks import get_openai_callback
 from langchain.agents.mrkl.output_parser import OutputParserException
+from langchain.chains import SimpleSequentialChain, LLMChain
+
 from openai import InvalidRequestError
 from sqlalchemy.engine import URL
 
 from db_data_interaction.toolkit import DbDataInteractionToolkit
+
 from prompts.agent_prompts import SQL_PREFIX, SQL_SUFFIX, get_formatted_hints
-from prompts.translator_prompts import translator_prompt
+from prompts.translator_prompts import TRANSLATOR_PROMPT
+
 from monitoring.callback import LogLLMPromptCallbackHandler
-from langchain.chains import SimpleSequentialChain, LLMChain
+
 from parsers.custom_output_parser import CustomOutputParserWithCallbackHandling, LastPromptSaverCallbackHandler
 
 
@@ -76,7 +80,9 @@ while True:
                 output_parser=output_parser,
                 max_iterations=5,
             )
-            translator_chain = LLMChain(llm=llm, prompt=translator_prompt)
+            translator_chain = LLMChain(
+                llm=llm, 
+                prompt=TRANSLATOR_PROMPT)
             overall_chain = SimpleSequentialChain(chains=[agent_executor, translator_chain], verbose=True)
             response = overall_chain.run(question,callbacks=[prompt_logger,last_prompt_saver,])
         except OutputParserException as e:
