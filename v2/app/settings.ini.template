@@ -1,1 +1,26 @@
-tg_bot_token = 12345678:AAAAAAAAAAAAAAAAAAA
+[tg]
+bot_token = 12345678:AAAAAAAAAAAAAAAAAAA
+users_whitelist = 12345678,87654321,123456789
+
+[debug]
+is_debug = True
+prompt_log_path = v2/test_scripts/prompt_log.txt
+
+[db]
+drivername = postgresql
+username = db_user
+password = qwerty12345
+host = 1.1.1.1
+port = 1111
+database = dwh_uas
+schema = dwh_uas
+tables_to_use = table1,table2,table3,table4,table5
+
+[openai]
+api_key = sk-qwerty12345
+temperature = 0.7
+
+[hints]
+db_hints_doc_path = v2/test_scripts/db_hints.txt
+sql_query_examples_path = v2/test_scripts/sql_query_examples.yaml
+query_hints_limit = 3

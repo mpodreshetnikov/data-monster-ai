@@ -12,7 +12,9 @@ def main():
     config = configparser.ConfigParser()
     config.read(os.path.join(__location__, "settings.ini"))
     
-    tg.run_bot_and_block_thread(config["tg"]["token"])
+    tg_bot_token = config["tg"]["bot_token"]
+    tg_users_whitelist = config["tg"]["whitelist"].split(",")
+    tg.run_bot_and_block_thread(tg_bot_token, tg_users_whitelist)
     
     
 if __name__ == "__main__":
