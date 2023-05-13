@@ -12,6 +12,14 @@ from db_data_interaction.db_description_tool import SQLDatabaseToolkitModified, 
 from db_data_interaction.query_hints_tool import SQLQueryHintsToolkit, SQLQueryHint
 
 
+DB_HINT_UNKNOWN_PHRASES = [
+    "не знаю", "не могу", "не владею",
+    "не имею","невозможно",
+    "cannot", "don't know", "can't",
+    "don't have", "don't understand", "sorry",
+    ]
+
+
 class DbDataInteractionToolkit(SQLDatabaseToolkitModified, BaseToolkit):
     db_hints_doc_path: str = Field(description="Path to the database documentation")
     sql_query_examples_path: str = Field(description="Path to the YAML file with the query examples")
@@ -54,7 +62,7 @@ class DbDataInteractionToolkit(SQLDatabaseToolkitModified, BaseToolkit):
             return None
         
         answer = tool.run(query)
-        if any((phrase in answer) for phrase in ["не знаю", "не могу", "не владею", "не имею", "невозможно", "cannot", "don't know", "can't", "don't have"]):
+        if any((phrase in answer) for phrase in DB_HINT_UNKNOWN_PHRASES):
             return None
         
         return answer
