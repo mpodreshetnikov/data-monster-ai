@@ -11,9 +11,11 @@ from sqlalchemy.engine import URL
 
 from db_data_interaction.toolkit import DbDataInteractionToolkit
 from prompts.agent_prompts import SQL_PREFIX, SQL_SUFFIX, get_formatted_hints
+from prompts.translator_prompts import translator_prompt
 from monitoring.callback import LogLLMPromptCallbackHandler
-
+from langchain.chains import SimpleSequentialChain, LLMChain
 from parsers.custom_output_parser import CustomOutputParserWithCallbackHandling, LastPromptSaverCallbackHandler
+
 
 
 config = configparser.ConfigParser()
@@ -74,11 +76,9 @@ while True:
                 output_parser=output_parser,
                 max_iterations=5,
             )
-            response = agent_executor.run(question,
-                                          callbacks=[
-                                              prompt_logger,
-                                              last_prompt_saver,
-                                            ])
+            translator_chain = LLMChain(llm=llm, prompt=translator_prompt)
+            overall_chain = SimpleSequentialChain(chains=[agent_executor, translator_chain], verbose=True)
+            response = overall_chain.run(question,callbacks=[prompt_logger,last_prompt_saver,])
         except OutputParserException as e:
             print(f"Не удается распознать результат работы ИИ: {e}")
             continue
@@ -87,3 +87,4 @@ while True:
             continue
         print(f"Response: {response}")
         print(cb)
+        
