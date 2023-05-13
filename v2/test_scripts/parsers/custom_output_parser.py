@@ -7,9 +7,9 @@ from typing import Any, Dict, List, Optional, Union
 from langchain.base_language import BaseLanguageModel
 from langchain.agents.agent import AgentOutputParser
 from langchain.agents.mrkl.prompt import FORMAT_INSTRUCTIONS
-from langchain.output_parsers.retry import RetryOutputParser
+from langchain.output_parsers.retry import RetryWithErrorOutputParser
 from langchain.prompts.base import StringPromptValue
-from langchain.schema import AgentAction, AgentFinish, LLMResult, OutputParserException
+from langchain.schema import AgentAction, AgentFinish, OutputParserException
 from langchain.callbacks.base import BaseCallbackHandler
 
 
@@ -40,7 +40,7 @@ class CustomOutputParserWithCallbackHandling(AgentOutputParser, BaseCallbackHand
     def parse(self, text: str) -> Union[AgentAction, AgentFinish]:
         inner_parser = __InnerCustomOutputParser__(is_debug=self.is_debug)
         if self.retrying_llm:
-            retry_parser = RetryOutputParser.from_llm(
+            retry_parser = RetryWithErrorOutputParser.from_llm(
                 llm=self.retrying_llm,
                 parser=inner_parser)
             prompt = self.last_prompt_saver_callback_handler._last_prompt
@@ -67,7 +67,10 @@ class __InnerCustomOutputParser__(AgentOutputParser):
         )
         match = re.search(regex, text, re.DOTALL)
         if not match:
-            error_str = f"Could not parse LLM output: `{text}`"
+            if "Action: None" in text:
+                error_str = "Action was None, but you must specify an action from the list."
+            else:
+                error_str = "Action and Action Input were not provided."
             if self.is_debug:
                 print(error_str)
             raise OutputParserException(error_str)
