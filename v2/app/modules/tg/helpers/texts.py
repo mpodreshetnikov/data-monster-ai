@@ -1,3 +1,9 @@
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
 def set_config_file_path(path: str):
     global __texts__
     __texts__ = __load_texts__(path)
@@ -13,10 +19,18 @@ def message_text_for(id: str, **kwargs) -> str:
     Returns:
         str: text by id
     """
-    text: dict | str = __texts__
+    text: dict | str = __texts__ or {}
     for key in id.split("."):
-        text = text[key]
-    formatted = text.format(**kwargs)
+        try:
+            text = text[key]
+        except:
+            logger.info(f"Tg text not found for id: {id}")
+            return id
+    try:
+        formatted = text.format(**kwargs)
+    except:
+        logger.error(f"Not all arguments provided for text with id: {id}", exc_info=True)
+        return text
     return formatted
 
 

@@ -14,7 +14,6 @@ def add_handlers(application: Application):
 @only_allowed_users
 async def __ask_brain_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
-    user_id = update.effective_user.id
     question = " ".join(context.args) if context.args else update.message.text
 
     answer = Brain().answer_text_question(question)

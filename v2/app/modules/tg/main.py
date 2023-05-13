@@ -1,5 +1,6 @@
 import modules.tg.handlers.init_chat_handlers as init_chat_handler
 import modules.tg.handlers.brain_handlers as brain_handlers
+import modules.tg.handlers.error_handlers as error_handlers
 from modules.tg.helpers.texts import set_config_file_path as set_texts_config_file_path
 from modules.security.main import set_users_white_list
 
@@ -50,6 +51,6 @@ def __setup_application__(token: str, users_whitelist: list[str] = None) -> Appl
     # Handlers, required order
     init_chat_handler.add_handlers(application)
     brain_handlers.add_handlers(application)
-    application.add_error_handler(lambda _, context: logger.error(context.error, exc_info=True))
+    error_handlers.add_handlers(application)
 
     return application

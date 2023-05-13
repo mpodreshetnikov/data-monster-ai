@@ -1,2 +1,6 @@
+from pydantic.dataclasses import dataclass
+
+
+@dataclass
 class UserNotAllowedException(Exception):
-    pass
+    method_name: str = None

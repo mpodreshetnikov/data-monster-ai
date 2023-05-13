@@ -1,10 +1,13 @@
-[tg]
-bot_token = 12345678:AAAAAAAAAAAAAAAAAAA
-users_whitelist = 12345678,87654321,123456789
+[common]
+log_path = logs
 
 [debug]
 is_debug = True
 prompt_log_path = v2/test_scripts/prompt_log.txt
+
+[tg]
+bot_token = 12345678:AAAAAAAAAAAAAAAAAAA
+whitelist = 12345678,87654321,123456789
 
 [db]
 drivername = postgresql

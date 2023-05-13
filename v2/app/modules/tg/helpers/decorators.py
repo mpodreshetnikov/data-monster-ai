@@ -1,14 +1,19 @@
+import logging
 from telegram import Update
 
 from modules.security.main import is_user_allowed
-from exceptions import UserNotAllowedException
-from texts import message_text_for
+from modules.tg.helpers.exceptions import UserNotAllowedException
+
+
+logger = logging.getLogger(__name__)
+
 
 def only_allowed_users(func):
     async def wrapper(*args, **kwargs):
-        update: Update = kwargs.get('update')
-        if not update or not isinstance(update, Update):
-            return await func(*args, **kwargs)
+        update: Update = next(filter(lambda t: isinstance(t, Update), args), None)
+        if not update:
+            logger.error("User access cannot be checked. <Update> not found in args", exc_info=True)
+            raise UserNotAllowedException(method_name=func.__name__)
         
         # Try to check by id
         tg_user_id = update.effective_user.id
@@ -20,6 +25,6 @@ def only_allowed_users(func):
         if is_user_allowed(tg_username):
             return await func(*args, **kwargs)
         
-        await update.message.reply_text(message_text_for("user_not_allowed"))
-        raise UserNotAllowedException()
+        raise UserNotAllowedException(method_name=func.__name__)
+    
     return wrapper
