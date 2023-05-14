@@ -36,5 +36,5 @@ def message_text_for(id: str, **kwargs) -> str:
 
 def __load_texts__(filepath: str) -> dict:
     import json
-    with open(filepath, "r") as file:
+    with open(filepath, "r", encoding='utf-8') as file:
         return json.load(file)
