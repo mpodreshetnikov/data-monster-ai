@@ -5,3 +5,7 @@ venv
 settings.ini
 log.txt
 indices
+*store
+.chroma
+*log.txt
+logs

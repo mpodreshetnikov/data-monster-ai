@@ -1,6 +1,6 @@
 import configparser
 from my_types import Interaction, AnswerType
-import answering.prompts as prompts, ai
+import answering.prompts as prompts, v1.ai as ai
 from db.dbaccess import DbAccess
 from tg_bot.correction import CorrectionDbAccess
 import logging, json

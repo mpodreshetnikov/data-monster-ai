@@ -1,0 +1,73 @@
+list:
+  - question: Выведи первых 3 сотрудников/рабочих с должностью фармацевта в штате?
+    tables: [uas_data_user]
+    query: |
+      SELECT *
+      FROM uas_data_user
+      WHERE position ILIKE 'Фармацевт' AND is_deleted = 0
+      ORDER BY name
+      LIMIT 3
+  - question: Какая средняя сумма чека за все время?
+    tables: [uas_cash_cheque]
+    query: |
+      SELECT round(avg(result))
+      FROM uas_cash_cheque
+      WHERE result != 0
+  - question: Кто проводил чек с номером c8a0f515-6dc3-44ba-a31e-430637f58712?
+    tables: [uas_data_user, uas_cash_cheque]
+    query: |
+      SELECT uas_data_user
+      FROM uas_data_user
+      JOIN uas_cash_cheque
+      ON uas_cash_cheque.user_id = uas_data_user.user_id 
+      WHERE uas_cash_cheque.cheque_id ='c8a0f515-6dc3-44ba-a31e-430637f58712'
+  - question: Какая аптека проводила чек с номером c8a0f515-6dc3-44ba-a31e-430637f58712? 
+    tables: [uas_data_cnt_company, uas_cash_cheque]
+    query: |
+      SELECT uas_data_cnt_company
+      FROM uas_data_cnt_company
+      JOIN uas_cash_cheque
+      ON uas_cash_cheque.owner_id  = uas_data_cnt_company.cnt_company_id  
+      WHERE uas_cash_cheque.cheque_id = 'c8a0f515-6dc3-44ba-a31e-430637f58712'
+  - question: Сколько у аптеки 122 г Норильска продано Глицина?
+    tables: [uas_data_med_nomenclature, uas_data_cnt_company, uas_cash_cheque_item]
+    query: |
+      SELECT Count(*)
+      FROM uas_cash_cheque 
+      JOIN uas_cash_session_doc ucsd
+      ON ucsd.session_id = uas_cash_cheque.cash_session_id 
+      JOIN uas_cash_cheque_item
+      ON uas_cash_cheque_item.cheque_id = uas_cash_cheque.cheque_id 
+      JOIN uas_data_med_nomenclature udmn
+      ON udmn.nomenclature_id = uas_cash_cheque_item.nomencl_id 
+      JOIN uas_data_cnt_company
+      ON ucsd.owner_id = uas_data_cnt_company.cnt_company_id 
+      WHERE 
+        udmn."name" ILIKE '%глицин%'
+        AND uas_data_cnt_company."name" ILIKE  '%аптека 122%' 
+        AND uas_data_cnt_company."name" ILIKE  '%Норильск%' 
+  - question: Сколько ежемесячно продаётся Нафтодерила
+    tables: [uas_data_med_nomenclature, uas_cash_cheque, uas_cash_cheque_item]
+    query: |
+      SELECT
+        DATE_TRUNC('month', uas_cash_cheque.dt_create) AS month,
+        SUM(uas_cash_cheque_item.qty)
+      FROM
+        uas_cash_cheque
+        JOIN uas_cash_cheque_item ON uas_cash_cheque.cheque_id = uas_cash_cheque_item.cheque_id
+        JOIN uas_data_med_nomenclature ON uas_cash_cheque_item.nomencl_id = uas_data_med_nomenclature.nomenclature_id     
+      WHERE
+        uas_data_med_nomenclature."name" ILIKE '%Нафтодерил%'
+      GROUP BY
+        month
+      ORDER BY
+        month DESC
+      LIMIT 10
+  - question: Выведи все возможные типы оплаты и типы скидок. 
+    tables: [uas_cash_cheque_sum]
+    query: |
+      SELECT distinct sum_type, discont_name
+      FROM uas_cash_cheque
+      JOIN uas_cash_cheque_item on uas_cash_cheque_item.cheque_id = uas_cash_cheque.cheque_id
+      JOIN uas_cash_cheque_sum on uas_cash_cheque_sum.check_id = uas_cash_cheque.cheque_id
+      WHERE sum_type notnull and discont_name notnull
