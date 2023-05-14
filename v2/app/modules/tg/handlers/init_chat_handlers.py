@@ -1,8 +1,8 @@
 from telegram.ext import Application, CommandHandler, ContextTypes
 from telegram import Update
 
-from modules.tg.helpers.texts import message_text_for
-from modules.tg.helpers.decorators import only_allowed_users
+from modules.tg.utils.texts import message_text_for
+from modules.tg.utils.decorators import only_allowed_users
 
 
 def add_handlers(application: Application):

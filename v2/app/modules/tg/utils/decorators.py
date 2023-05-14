@@ -2,7 +2,7 @@ import logging
 from telegram import Update
 
 from modules.security.main import is_user_allowed
-from modules.tg.helpers.exceptions import UserNotAllowedException
+from modules.tg.utils.exceptions import UserNotAllowedException
 
 
 logger = logging.getLogger(__name__)

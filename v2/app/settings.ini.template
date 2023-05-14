@@ -3,7 +3,7 @@ log_path = logs
 
 [debug]
 is_debug = True
-prompt_log_path = v2/test_scripts/prompt_log.txt
+prompt_log_path = logs/prompt_log.txt
 
 [tg]
 bot_token = 12345678:AAAAAAAAAAAAAAAAAAA

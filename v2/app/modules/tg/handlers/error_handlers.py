@@ -3,8 +3,8 @@ import logging
 from telegram.ext import Application, ContextTypes
 from telegram import Update
 
-from modules.tg.helpers.exceptions import UserNotAllowedException
-from modules.tg.helpers.texts import message_text_for
+from modules.tg.utils.exceptions import UserNotAllowedException
+from modules.tg.utils.texts import message_text_for
 
 
 logger = logging.getLogger(__name__)
