@@ -18,8 +18,7 @@ from prompts.translator_prompts import TRANSLATOR_PROMPT
 
 from monitoring.callback import LogLLMPromptCallbackHandler
 
-from parsers.custom_output_parser import CustomOutputParserWithCallbackHandling, LastPromptSaverCallbackHandler
-
+from parsers.custom_output_parser import CustomAgentOutputParser, LastPromptSaverCallbackHandler
 
 
 config = configparser.ConfigParser()
@@ -63,7 +62,7 @@ while True:
     with get_openai_callback() as cb:
         prompt_logger = LogLLMPromptCallbackHandler(log_path=prompt_log_path)
         last_prompt_saver = LastPromptSaverCallbackHandler()
-        output_parser = CustomOutputParserWithCallbackHandling(
+        output_parser = CustomAgentOutputParser(
             retrying_llm=llm,
             is_debug=is_debug,
             retrying_last_prompt_saver=last_prompt_saver,

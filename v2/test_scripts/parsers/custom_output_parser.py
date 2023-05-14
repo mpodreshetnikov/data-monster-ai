@@ -38,7 +38,7 @@ class LastPromptSaverCallbackHandler(BaseCallbackHandler):
         return prompt
 
 
-class CustomOutputParserWithCallbackHandling(AgentOutputParser, BaseCallbackHandler):
+class CustomAgentOutputParser(AgentOutputParser):
     is_debug: bool = Field(default=False)
     retrying_llm: BaseLanguageModel = Field(default=None)
     retrying_last_prompt_saver: LastPromptSaverCallbackHandler = Field()
@@ -48,7 +48,7 @@ class CustomOutputParserWithCallbackHandling(AgentOutputParser, BaseCallbackHand
         return FORMAT_INSTRUCTIONS
     
     def parse(self, text: str) -> Union[AgentAction, AgentFinish]:
-        inner_parser = __InnerCustomOutputParser__(is_debug=self.is_debug)
+        inner_parser = __InnerCustomAgentOutputParser__(is_debug=self.is_debug)
         if self.retrying_llm and self.retrying_last_prompt_saver:
             llm_chain = LLMChain(llm=self.retrying_llm, prompt=RETRY_WITH_ERROR_PROMPT)
             retry_parser = CustomRetryWithErrorOutputParser(parser=inner_parser, retry_chain=llm_chain, callbacks=self.retrying_chain_callbacks)
@@ -61,7 +61,7 @@ class CustomOutputParserWithCallbackHandling(AgentOutputParser, BaseCallbackHand
         arbitrary_types_allowed = True
 
 
-class __InnerCustomOutputParser__(AgentOutputParser):
+class __InnerCustomAgentOutputParser__(AgentOutputParser):
     is_debug = Field(default=False)
 
     def parse(self, text: str) -> Union[AgentAction, AgentFinish]:
