@@ -53,7 +53,7 @@ class DbDataInteractionToolkit(SQLDatabaseToolkitModified, BaseToolkit):
     def get_tools(self) -> list[BaseTool]:
         return self.available_tools
     
-    def get_db_hint(self, query: str) -> str:
+    def get_db_hint(self, query: str) -> str | None:
         if not self.db_hints_doc_path:
             return None
         
@@ -67,13 +67,13 @@ class DbDataInteractionToolkit(SQLDatabaseToolkitModified, BaseToolkit):
         
         return answer
     
-    def get_query_hints(self, query: str, limit: int) -> list[SQLQueryHint]:
+    def get_query_hints(self, query: str, limit: int) -> list[SQLQueryHint] | None:
         if not self.sql_query_hints_toolkit:
-            return "no hints available"
+            return None
         return self.sql_query_hints_toolkit.get_top_hints(query, limit)
     
-    def get_table_info(self, table: str) -> str:
+    def get_table_info(self, table: str) -> str | None:
         tool: InfoSQLDatabaseWithCommentsTool = next(filter(lambda t: isinstance(t, InfoSQLDatabaseWithCommentsTool), self.all_tools), None)
         if not tool:
-            return "no info available"
+            return None
         return tool.run(table)

@@ -29,7 +29,10 @@ class SQLQueryHintsToolkit(BaseToolkit):
     vector_store: VectorStore = None
 
     def build(self):
-        self.vector_store = Chroma(embedding_function=self.embed_model, persist_directory=self.persist_directory)
+        self.vector_store = Chroma(
+            collection_name="sql_query_hints",
+            embedding_function=self.embed_model,
+            persist_directory=self.persist_directory)
 
         with open(self.queries_path, "r", encoding="utf-8") as f:
             self.queries = yaml.safe_load(f)["list"]

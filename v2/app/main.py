@@ -18,18 +18,26 @@ __location__ = os.path.realpath(
 def main():
     config = ConfigParser()
     config.read(os.path.join(__location__, "settings.ini"))
-    
-    is_debug = config.getboolean("debug", "is_debug", fallback=False)
-    
-    log_path = config.get("common", "log_path", fallback="logs")
-    __configure_logger__(log_path, verbose=is_debug)
-    
-    brain = __configure_brain__(config, verbose=is_debug)
+
+    __configure_logger__(config)
+
+    brain = __configure_brain__(config)
+
+    run_in_console = config.getboolean("debug", "run_in_console", fallback=False)
+    if run_in_console:
+        __run_bot_in_console_and_block_thread__(brain)
+
     tg_bot_token = config.get("tg", "bot_token")
     tg_users_whitelist = config.get("tg", "whitelist").split(",")
     tg.run_bot_and_block_thread(tg_bot_token, brain, tg_users_whitelist)
 
-def __configure_brain__(config: ConfigParser, verbose: bool = False) -> Brain:
+def __run_bot_in_console_and_block_thread__(brain: Brain):
+    while True:
+        question = str(input("Задай вопрос: "))
+        brain.answer(question)
+
+def __configure_brain__(config: ConfigParser) -> Brain:
+    verbose = config.getboolean("debug", "verbose", fallback=False)
     db = __configure_db__(config)
     llm = __configure_llm__(config)
     brain = Brain(
@@ -43,7 +51,8 @@ def __configure_brain__(config: ConfigParser, verbose: bool = False) -> Brain:
     )
     return brain
 
-def __configure_llm__(config: ConfigParser, verbose: bool = False) -> BaseLanguageModel:
+def __configure_llm__(config: ConfigParser) -> BaseLanguageModel:
+    verbose = config.getboolean("debug", "verbose", fallback=False)
     openai_api_key = config.get("openai", "api_key")
     temperature = config.getfloat("openai", "temperature", fallback=0.7)
     os.environ["OPENAI_API_KEY"] = openai_api_key
@@ -64,14 +73,16 @@ def __configure_db__(config: ConfigParser) -> SQLDatabase:
     db = SQLDatabase.from_uri(url, schema=schema, include_tables=include_tables)
     return db
 
-def __configure_logger__(log_path: str, log_filename: str = 'log.txt', verbose: bool = False):
+def __configure_logger__(config: ConfigParser, log_filename: str = 'log.txt'):
     log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
     root_logger = logging.getLogger()
 
+    log_path = config.get("common", "log_path", fallback="logs")
     file_handler = logging.FileHandler("{0}/{1}".format(log_path, log_filename))
     file_handler.setFormatter(log_formatter)
     root_logger.addHandler(file_handler)
 
+    verbose = config.getboolean("debug", "verbose", fallback=False)
     if verbose:
         root_logger.setLevel(logging.INFO)
         console_handler = logging.StreamHandler()

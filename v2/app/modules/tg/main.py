@@ -43,7 +43,9 @@ def __setup_application__(token: str, brain: Brain, users_whitelist: list[str] =
     __location__ = os.path.realpath(
         os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-    application = ApplicationBuilder().token(token).concurrent_updates(True).build()
+    application = ApplicationBuilder().token(token)\
+        .concurrent_updates(True)\
+        .build()
 
     set_texts_config_file_path(os.path.join(__location__, "tg_texts.json"))
     if users_whitelist:

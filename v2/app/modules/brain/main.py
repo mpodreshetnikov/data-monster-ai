@@ -1,3 +1,5 @@
+import logging
+
 from langchain import LLMChain, SQLDatabase
 from langchain.base_language import BaseLanguageModel
 from langchain.embeddings.base import Embeddings
@@ -20,6 +22,9 @@ from modules.brain.llm.parsers.custom_output_parser import CustomAgentOutputPars
 from modules.brain.llm.parsers.custom_output_parser import LastPromptSaverCallbackHandler
 
 
+logger = logging.getLogger(__name__)
+
+
 class Brain:
     db: SQLDatabase
     default_llm: BaseLanguageModel
@@ -36,6 +41,7 @@ class Brain:
             self,
             db: SQLDatabase,
             llm: BaseLanguageModel = None,
+            embeddings: Embeddings = None,
             db_hints_doc_path: str = None,
             sql_query_examples_path: str = None,
             sql_query_hints_limit: int = 0,
@@ -49,33 +55,35 @@ class Brain:
         self._sql_agent_max_iterations = sql_agent_max_iterations
         if prompt_log_path:
             self._inheritable_llm_callbacks.append(LogLLMPromptCallbackHandler(prompt_log_path))
-        self.default_embeddings = OpenAIEmbeddings()
+        if not embeddings:
+            logger.warning("No embeddings provided, using default OpenAIEmbeddings")
+        self.default_embeddings = embeddings or OpenAIEmbeddings()
+        if not llm:
+            logger.warning("No llm provided, using default ChatOpenAI")
         self.default_llm = llm or ChatOpenAI(verbose=self._verbose)
         self._default_sql_llm_toolkit = self.__build_sql_llm_toolkit(db_hints_doc_path, sql_query_examples_path)
 
-    def answer_question(self, question: str) -> str:
+    def answer(self, question: str) -> str:
         last_prompt_saver = LastPromptSaverCallbackHandler()
         sql_agent_chain = self.__build_sql_agent_chain__(question, last_prompt_saver)
         lang_translator_chain = self.__build_lang_translator_chain__()
         
         overall_chain = SimpleSequentialChain(
             chains=[sql_agent_chain, lang_translator_chain],
-            callbacks=self._inheritable_llm_callbacks,
             verbose=self._verbose,)
         
         with get_openai_callback() as openai_cb:
             try:
                 response = overall_chain.run(
                     question,
-                    callbacks=[last_prompt_saver])
+                    callbacks=[last_prompt_saver, *self._inheritable_llm_callbacks],)
             except OutputParserException as e:
-                # print(f"Не удается распознать результат работы ИИ: {e}")
+                logger.error(f"Parser cannot parse AI answer", exc_info=True)
                 raise e
             except InvalidRequestError as e:
-                # print(f"Ошибка при запросе к OpenAI: {e}")
+                logger.error(f"Error while asking OpenAI", exc_info=True)
                 raise e
-            # print(f"Response: {response}")
-            # print(cb)
+            logger.info(openai_cb)
         return response
         
     
@@ -95,8 +103,7 @@ class Brain:
         with get_openai_callback() as openai_cb:
             toolkit.build()
             if self._verbose:
-                pass
-                # TODO log usage of openai api
+                logger.info(f"Toolkit builded successfully\n{openai_cb}")
         return toolkit
     
     def __build_sql_agent_chain__(
