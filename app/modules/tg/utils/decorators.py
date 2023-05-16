@@ -32,20 +32,3 @@ def a_only_allowed_users(func):
         raise UserNotAllowedException(method_name=func.__name__)
 
     return wrapper
-
-
-def a_time_watcher(storage: ExecInfoStorage):
-    def inner(func):
-        if not storage:
-            logger.warning(f"Storage is not provided for func {func.__name__}. Time watcher will not work.")
-            return func
-        
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            storage.start(func.__name__)
-            result = await func(*args, **kwargs)
-            storage.stop(func.__name__)
-            return result
-
-        return wrapper
-    return inner
