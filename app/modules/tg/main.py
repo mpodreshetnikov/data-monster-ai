@@ -2,7 +2,7 @@ import modules.tg.handlers.init_chat_handlers as init_chat_handler
 import modules.tg.handlers.brain_handlers as brain_handlers
 import modules.tg.handlers.error_handlers as error_handlers
 from modules.tg.utils.texts import set_config_file_path as set_texts_config_file_path
-from modules.security.main import set_users_white_list
+from modules.common.security import set_users_white_list
 from modules.brain.main import Brain
 
 from telegram.ext import ApplicationBuilder, Application
