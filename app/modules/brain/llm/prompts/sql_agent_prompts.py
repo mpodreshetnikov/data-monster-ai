@@ -48,7 +48,7 @@ AGENT_RETRY_WITH_ERROR_PROMPT = PromptTemplate.from_template(__AGENT_RETRY_WITH_
 import datetime
 
 from modules.brain.llm.tools.db_data_interaction.toolkit import DbDataInteractionToolkit
-from modules.brain.utils.console_colors import BOLD, END
+from modules.common.console_colors import BOLD, END
 
 
 def get_sql_suffix_with_hints(hints: str) -> str:

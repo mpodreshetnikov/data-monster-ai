@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 def a_only_allowed_users(func):
     from telegram import Update
-    from modules.security.main import is_user_allowed
+    from modules.common.security import is_user_allowed
     from modules.tg.utils.exceptions import UserNotAllowedException
     
     @wraps(func)
