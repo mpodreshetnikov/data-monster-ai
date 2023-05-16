@@ -1,14 +1,18 @@
 import logging
-from telegram import Update
+from functools import wraps
 
-from modules.security.main import is_user_allowed
-from modules.tg.utils.exceptions import UserNotAllowedException
+from modules.tg.utils.time_watching import ExecInfoStorage
 
 
 logger = logging.getLogger(__name__)
 
 
-def only_allowed_users(func):
+def a_only_allowed_users(func):
+    from telegram import Update
+    from modules.security.main import is_user_allowed
+    from modules.tg.utils.exceptions import UserNotAllowedException
+    
+    @wraps(func)
     async def wrapper(*args, **kwargs):
         update: Update = next(filter(lambda t: isinstance(t, Update), args), None)
         if not update:
@@ -26,5 +30,22 @@ def only_allowed_users(func):
             return await func(*args, **kwargs)
         
         raise UserNotAllowedException(method_name=func.__name__)
-    
+
     return wrapper
+
+
+def a_time_watcher(storage: ExecInfoStorage):
+    def inner(func):
+        if not storage:
+            logger.warning(f"Storage is not provided for func {func.__name__}. Time watcher will not work.")
+            return func
+        
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            storage.start(func.__name__)
+            result = await func(*args, **kwargs)
+            storage.stop(func.__name__)
+            return result
+
+        return wrapper
+    return inner
