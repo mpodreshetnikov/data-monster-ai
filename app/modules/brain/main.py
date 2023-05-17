@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 
 from langchain import LLMChain, SQLDatabase
 from langchain.base_language import BaseLanguageModel
@@ -17,19 +18,26 @@ from openai import InvalidRequestError
 from modules.brain.llm.tools.db_data_interaction.toolkit import DbDataInteractionToolkit
 from modules.brain.llm.prompts.sql_agent_prompts import SQL_PREFIX, get_formatted_hints, get_sql_suffix_with_hints
 from modules.brain.llm.prompts.translator_prompts import TRANSLATOR_PROMPT
-from modules.brain.llm.monitoring.callback import LogLLMPromptCallbackHandler
+from modules.brain.llm.monitoring.callback import LogLLMRayCallbackHandler
 from modules.brain.llm.parsers.custom_output_parser import CustomAgentOutputParser
 from modules.brain.llm.parsers.custom_output_parser import LastPromptSaverCallbackHandler
+from modules.common.errors import add_info_to_exception
 
 
 logger = logging.getLogger(__name__)
 
 
 class Brain:
+    @dataclass
+    class Answer:
+        ray_id: str
+        text: str
+        
     db: SQLDatabase
     default_llm: BaseLanguageModel
     default_embeddings: Embeddings
     
+    _prompt_log_path: str = None
     _inheritable_llm_callbacks: Callbacks = []
     _verbose: bool = False
     _default_sql_llm_toolkit: DbDataInteractionToolkit = None
@@ -53,8 +61,7 @@ class Brain:
         self._verbose = verbose
         self._sql_query_hints_limit = sql_query_hints_limit
         self._sql_agent_max_iterations = sql_agent_max_iterations
-        if prompt_log_path:
-            self._inheritable_llm_callbacks.append(LogLLMPromptCallbackHandler(prompt_log_path))
+        self._prompt_log_path = prompt_log_path
         if not embeddings:
             logger.warning("No embeddings provided, using default OpenAIEmbeddings")
         self.default_embeddings = embeddings or OpenAIEmbeddings()
@@ -63,7 +70,7 @@ class Brain:
         self.default_llm = llm or ChatOpenAI(verbose=self._verbose)
         self._default_sql_llm_toolkit = self.__build_sql_llm_toolkit(db_hints_doc_path, sql_query_examples_path)
 
-    def answer(self, question: str) -> str:
+    def answer(self, question: str) -> Answer:
         last_prompt_saver = LastPromptSaverCallbackHandler()
         sql_agent_chain = self.__build_sql_agent_chain__(question, last_prompt_saver)
         lang_translator_chain = self.__build_lang_translator_chain__()
@@ -72,19 +79,26 @@ class Brain:
             chains=[sql_agent_chain, lang_translator_chain],
             verbose=self._verbose,)
         
+        ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path)
         with get_openai_callback() as openai_cb:
             try:
                 response = overall_chain.run(
                     question,
-                    callbacks=[last_prompt_saver, *self._inheritable_llm_callbacks],)
+                    callbacks=[last_prompt_saver, ray_logger, *self._inheritable_llm_callbacks],)
             except OutputParserException as e:
-                logger.error(f"Parser cannot parse AI answer", exc_info=True)
+                logger.error("Parser cannot parse AI answer", exc_info=True)
+                e = add_info_to_exception(e, "ray_id", ray_logger.get_ray_str())
                 raise e
             except InvalidRequestError as e:
-                logger.error(f"Error while asking OpenAI", exc_info=True)
+                logger.error("Error while asking OpenAI", exc_info=True)
+                e = add_info_to_exception(e, "ray_id", ray_logger.get_ray_str())
+                raise e
+            except Exception as e:
+                e = add_info_to_exception(e, "ray_id", ray_logger.get_ray_str())
                 raise e
             logger.info(openai_cb)
-        return response
+        
+        return self.Answer(ray_logger.get_ray_str(), response)
         
     
     def __build_sql_llm_toolkit(

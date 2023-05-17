@@ -19,4 +19,4 @@ async def __chat_started_handler__(update: Update, context: ContextTypes.DEFAULT
     chat_id = update.effective_chat.id
     user_name = update.effective_user.name
     logger.info(f"User {user_name}:{update.effective_user.id} started a chat")
-    await context.bot.send_message(chat_id, message_text_for("hello", name=user_name))
+    await context.bot.send_message(chat_id, message_text_for("hello", name=user_name), parse_mode="HTML")
