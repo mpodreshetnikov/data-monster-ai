@@ -9,3 +9,4 @@ indices
 .chroma
 *log.txt
 logs
+*.sqlite

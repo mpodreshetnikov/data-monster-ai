@@ -1,6 +1,8 @@
 import modules.tg.handlers.init_chat_handlers as init_chat_handler
 import modules.tg.handlers.brain_handlers as brain_handlers
 import modules.tg.handlers.error_handlers as error_handlers
+import modules.tg.handlers.sql_handlers as sql_handlers
+
 from modules.tg.utils.texts import set_config_file_path as set_texts_config_file_path
 from modules.common.security import set_users_white_list
 from modules.brain.main import Brain
@@ -27,7 +29,6 @@ async def start_bot(token: str):
     await application.start()
     await application.updater.start_polling()
     logger.info("Telegram bot started")
-    
     return application
 
 
@@ -55,5 +56,6 @@ def __setup_application__(token: str, brain: Brain, users_whitelist: list[str] =
     init_chat_handler.add_handlers(application)
     brain_handlers.add_handlers(application, brain)
     error_handlers.add_handlers(application)
+    sql_handlers.add_handlers(application)
 
     return application

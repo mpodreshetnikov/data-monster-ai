@@ -9,8 +9,7 @@ from sqlalchemy import URL
 
 import modules.tg.main as tg
 from modules.brain.main import Brain
-
-
+import  modules.localdb.main as localdb
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
@@ -22,7 +21,7 @@ def main():
     __configure_logger__(config)
 
     brain = __configure_brain__(config)
-
+    localdb.create_db()
     run_in_console = config.getboolean("debug", "run_in_console", fallback=False)
     if run_in_console:
         __run_bot_in_console_and_block_thread__(brain)

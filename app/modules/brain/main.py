@@ -22,7 +22,7 @@ from modules.brain.llm.monitoring.callback import LogLLMRayCallbackHandler
 from modules.brain.llm.parsers.custom_output_parser import CustomAgentOutputParser
 from modules.brain.llm.parsers.custom_output_parser import LastPromptSaverCallbackHandler
 from modules.common.errors import add_info_to_exception
-
+from modules.localdb.service_sql import SQLService
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +69,7 @@ class Brain:
             logger.warning("No llm provided, using default ChatOpenAI")
         self.default_llm = llm or ChatOpenAI(verbose=self._verbose)
         self._default_sql_llm_toolkit = self.__build_sql_llm_toolkit(db_hints_doc_path, sql_query_examples_path)
+        self.sql_service = SQLService()
 
     def answer(self, question: str) -> Answer:
         last_prompt_saver = LastPromptSaverCallbackHandler()
@@ -98,6 +99,7 @@ class Brain:
                 raise e
             logger.info(openai_cb)
         
+        self.sql_service.save_sql_str(ray_logger.sql)
         return self.Answer(ray_logger.get_ray_str(), response)
         
     

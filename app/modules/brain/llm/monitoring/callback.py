@@ -4,6 +4,7 @@ from langchain.callbacks.base import BaseCallbackHandler
 from langchain.schema import LLMResult
 from pydantic import Field
 import time
+from models.sql import SQLModel
 
 from base64 import b32encode
 from os import urandom
@@ -12,7 +13,7 @@ from os import urandom
 class LogLLMRayCallbackHandler(BaseCallbackHandler):
     log_path: str = Field()
     ray_id: str = Field()
-
+    sql:SQLModel = SQLModel()
     def __init__(self, log_path: str) -> None:
         self.log_path = log_path
         self.ray_id = str(b32encode(urandom(10))).replace("b'", "").replace("'", "")
@@ -34,3 +35,11 @@ class LogLLMRayCallbackHandler(BaseCallbackHandler):
             with open(self.log_path, "a", encoding="utf-8") as f:
                 f.write(header_str)
                 f.write(str(response))
+                
+    def on_tool_start(self,serialized: Dict[str, Any],input_str: str, *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any,) -> None:
+        self.sql.id = self.ray_id
+        self.sql.value = input_str 
+        
+
+
+    
