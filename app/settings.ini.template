@@ -9,6 +9,7 @@ prompt_log_path = logs/prompt_log.txt
 [tg]
 bot_token = 12345678:AAAAAAAAAAAAAAAAAAA
 whitelist = tg_login,tg_login,tg_user_id
+web_app_storage_base_link = https://mpodreshetnikov.ru/gpt_bi_bot/tg_web_app_pages
 
 [db]
 drivername = postgresql
