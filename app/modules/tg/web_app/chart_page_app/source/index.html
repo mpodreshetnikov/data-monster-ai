@@ -34,45 +34,45 @@
     #chart-container {
         background-color: var(--tg-theme-bg-color);
         width: 100%;
-        height: var(--tg-viewport-height);
-    }
-
-    #chart {
-        width: 100%;
-        height: var(--tg-viewport-stable-height) !important;
+        height: calc(var(--tg-viewport-stable-height) - 30px);
     }
 </style>
-<script type="text/javascript">
-    Telegram.WebApp.ready();
-    Telegram.WebApp.MainButton.setText('Закрыть').show().onClick(function () {
-        Telegram.WebApp.close();
-    });
-</script>
 <body>
     <div id="chart-container">
         <canvas id="chart"></canvas>
     </div>
 </body>
 <script type="text/javascript">
+    const telegram = Telegram.WebApp
+    telegram.ready();
+    telegram.MainButton.setText('Закрыть').show().onClick(function () {
+        telegram.close();
+    });
+
     config.options = {
             maintainAspectRatio: false,
             responsive: true,
             scales: {
                     x: {
                         ticks: {
-                            color: Telegram.WebApp.themeParams.text_color
+                            color: telegram.themeParams.text_color
                         }
                     },
                     y: {
                         ticks: {
-                            color: Telegram.WebApp.themeParams.text_color
+                            color: telegram.themeParams.text_color
                         }
                     }
                 },
             plugins: {
                 title: {
                     display: true,
-                    text: 'График количества продаж по месяца за 2023 год'
+                    text: 'График количества продаж по месяцам за 2023 год'
+                },
+                legend: {
+                    labels: {
+                        color: telegram.themeParams.text_color || '#fff'
+                    }
                 },
                 zoom: {
                     zoom: {
@@ -82,31 +82,37 @@
                         pinch: {
                             enabled: true
                         },
-                        pan: {
-                            enabled: true,
-                        },
                         mode: 'xy',
                     }
                 },
             },
         };
-    const setup_bg_plugin = {
+    const setup_plugin = {
         id: 'customCanvasBackgroundColor',
         beforeDraw: (chart, args, options) => {
-            Chart.defaults.color = Telegram.WebApp.themeParams.text_color;
             const {ctx} = chart;
             ctx.save();
             ctx.globalCompositeOperation = 'destination-over';
-            ctx.fillStyle = Telegram.WebApp.themeParams.bg_color || '#fff';
+            ctx.fillStyle = telegram.themeParams.bg_color;
             ctx.fillRect(0, 0, chart.width, chart.height);
             ctx.restore();
+            
+            Chart.defaults.color = telegram.themeParams.text_color || '#fff';
         }
     };
-    config.plugins = [setup_bg_plugin];
+    config.plugins = [setup_plugin];
+
     const canvas = document.getElementById('chart');
-    new Chart(canvas, config);
+    let chart = new Chart(canvas, config);
+
+    telegram.onEvent('themeChanged', function () {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        chart.destroy();
+        chart = new Chart(canvas, config);
+    })
 </script>
 <script type="text/javascript">
-    Telegram.WebApp.expand();
+    telegram.expand();
 </script>
 </html>
