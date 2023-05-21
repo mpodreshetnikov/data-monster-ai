@@ -1,4 +1,5 @@
 import logging
+from httpx import LocalProtocolError
 
 from telegram.ext import Application, ContextTypes
 from telegram import Update
@@ -18,6 +19,10 @@ def add_handlers(application: Application):
 async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE):
     error = context.error
     ray_id = get_info_from_exception(error, "ray_id")
+
+    if (isinstance(error, LocalProtocolError)):
+        logger.error(error, exc_info=True)
+        return
 
     if isinstance(error, UserNotAllowedException):
         username = update.effective_user.username

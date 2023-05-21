@@ -27,14 +27,18 @@ def main():
     if run_in_console:
         __run_bot_in_console_and_block_thread__(brain)
 
-    tg_bot_token = config.get("tg", "bot_token")
-    tg_users_whitelist = config.get("tg", "whitelist").split(",")
-    tg.run_bot_and_block_thread(tg_bot_token, brain, tg_users_whitelist)
+    __run_bot_and_block_thread__(config, brain)
 
 def __run_bot_in_console_and_block_thread__(brain: Brain):
     while True:
         question = str(input("Задай вопрос: "))
         brain.answer(question)
+
+def __run_bot_and_block_thread__(config: ConfigParser, brain: Brain):
+    tg_bot_token = config.get("tg", "bot_token")
+    tg_users_whitelist = config.get("tg", "whitelist").split(",")
+    tg_web_app_storage_base_link = config.get("tg", "web_app_storage_base_link")
+    tg.run_bot_and_block_thread(tg_bot_token, brain, tg_users_whitelist, tg_web_app_storage_base_link)
 
 def __configure_brain__(config: ConfigParser) -> Brain:
     verbose = config.getboolean("debug", "verbose", fallback=False)
