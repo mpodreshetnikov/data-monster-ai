@@ -15,8 +15,8 @@ import os
 logger = logging.getLogger(__name__)
 
 
-def run_bot_and_block_thread(token: str, brain: Brain, engine: Engine, web_app_base_url: str = None, users_whitelist: list[str] = None):
-    application = __setup_application__(token, brain, users_whitelist)
+def run_bot_and_block_thread(token: str, brain: Brain, engine: Engine, users_whitelist: list[str] = None, web_app_base_url: str = None, ):
+    application = __setup_application__(token, brain, engine, users_whitelist, web_app_base_url)
     logger.info("Running telegram bot...")
     application.run_polling()
 
@@ -40,7 +40,7 @@ async def stop_bot(application: Application):
     logger.info("Telegram bot stopped")
 
 
-def __setup_application__(token: str, brain: Brain, engine: Engine, web_app_base_url: str = None, users_whitelist: list[str] = None) -> Application:
+def __setup_application__(token: str, brain: Brain, engine: Engine, users_whitelist: list[str] = None, web_app_base_url: str = None,) -> Application:
     __location__ = os.path.realpath(
         os.path.join(os.getcwd(), os.path.dirname(__file__)))
 

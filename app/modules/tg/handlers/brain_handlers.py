@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 SQL_CALLBACK_PATTERN = 'sql'
 
 
-def add_handlers(application: Application, brain: Brain, web_app_base_url: str, engine: Engine):
+def add_handlers(application: Application, brain: Brain, engine: Engine, web_app_base_url: str):
     application.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND, __get__ask_brain_handler__(brain, web_app_base_url)))
 
@@ -55,16 +55,18 @@ def __get__ask_brain_handler__(brain: Brain, web_app_base_url: str) -> None:
 
         exec_info_storage_key = f"{chat_id}_{user_id}"
         exec_info_storage.start(exec_info_storage_key)
-        # --- START OF ANSWERING BODY
 
         answer = brain.answer(question)
 
         logger.info(
-            f"User {update.effective_user.username}:{update.effective_user.id} got brain answer: {str(answer.text)}")
+            f"User {update.effective_user.username}:{update.effective_user.id} got brain answer: {str(answer.answer_text)}")
 
+        sql_button = None
+        chart_button = None
+        
         if answer.sql_script is not None:
             sql_button = InlineKeyboardButton(
-                "SQL", callback_data=f'{SQL_CALLBACK_PATTERN}:{answer.ray_id}')
+                text=message_text_for("answer_show_sql_button"), callback_data=f'{SQL_CALLBACK_PATTERN}:{answer.ray_id}')
 
         if answer.chart_code and web_app_base_url:
             web_app = WebApp(WebAppTypes.ChartPage, web_app_base_url)
@@ -106,11 +108,13 @@ async def sql_button(update: Update, context: ContextTypes.DEFAULT_TYPE, engine:
     with engine.Session() as session:
         brain_response_data = session.query(
             BrainResponseData).filter_by(ray_id=ray_id).first()
-    if brain_response_data:
-        answer_with_sql = answer_without_sql + brain_response_data.sql_script
-        await query.edit_message_text(text=answer_with_sql)
-        await query.edit_message_reply_markup(reply_markup=None)
-    else:
-        error_message = "Произошла ошибка и sql-запрос к сожалению утерян"
-        await context.bot.send_message(chat_id, error_message)
-        await query.edit_message_reply_markup(reply_markup=None)
+        reply_markup = query.message.reply_markup
+        keyboard_without_sql = [button for button in reply_markup.inline_keyboard if button[0].text != message_text_for("answer_show_sql_button")]
+        if brain_response_data:
+            answer_with_sql = answer_without_sql + brain_response_data.sql_script
+            await query.edit_message_text(text=answer_with_sql)
+            await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard_without_sql))
+        else:
+            error_message = "Произошла ошибка и sql-запрос к сожалению утерян"
+            await context.bot.send_message(chat_id, error_message)
+            await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard_without_sql))

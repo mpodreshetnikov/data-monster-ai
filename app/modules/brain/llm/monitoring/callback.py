@@ -12,14 +12,17 @@ from os import urandom
 class LogLLMRayCallbackHandler(BaseCallbackHandler):
     log_path: str = Field()
     ray_id: str = Field()
-    brain_response_data: BrainResponseData = BrainResponseData()
-
+    sql_script:str = Field()
+    
     def __init__(self, log_path: str) -> None:
         self.log_path = log_path
         self.ray_id = str(uuid.uuid4())
 
     def get_ray_str(self) -> str:
         return self.ray_id
+    
+    def get_sql_script(self) -> str:
+        return self.sql_script
 
     def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], *, run_id: UUID, parent_run_id: UUID | None = None, **kwargs: Any) -> Any:
         if self.log_path:
@@ -38,5 +41,4 @@ class LogLLMRayCallbackHandler(BaseCallbackHandler):
 
     def on_tool_start(self, serialized: Dict[str, Any], input_str: str, *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any,) -> None:
         if serialized['name'] == 'query_sql_db':
-            self.brain_response_data.ray_id = self.ray_id
-            self.brain_response_data.sql_script = input_str
+            self.sql_script = input_str

@@ -25,6 +25,8 @@ from modules.common.errors import add_info_to_exception
 
 from modules.data_access.main import Engine
 
+from modules.data_access.models.brain_response_data import BrainResponseData
+
 logger = logging.getLogger(__name__)
 
 
@@ -81,6 +83,8 @@ class Brain:
         ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path)
         answer = self.Answer(question, ray_logger.get_ray_str())
         answer.answer_text = self.__provide_text_answer__(question, ray_logger)
+        answer.sql_script = ray_logger.get_sql_script()
+        self.__add_brain_response_data__(ray_logger.get_ray_str(), ray_logger.get_sql_script())
         if self.__is_chart_needed__(question):
             answer.chart_code = self.__provide_chart_code__()
         return answer
@@ -88,10 +92,21 @@ class Brain:
     def __provide_chart_code__(self) -> str:
         return "TODO"
 
+    def __add_brain_response_data__(self, ray_id, sql_script) -> None:
+        try:
+            with self.engine.Session() as session:
+                brain_response_data = BrainResponseData(ray_id=ray_id, sql_script = sql_script)
+                session.add(brain_response_data)
+                session.commit()
+        except Exception as e:
+            logger.error("failed to write to database", exc_info=True)
+            e = add_info_to_exception(
+                e, "ray_id", ray_id)
+            raise e
+
     def __is_chart_needed__(self, question: str) -> bool:
         keywords = ["chart", "plot", "graph", "график", "диаграмма", "построить"]
         return any([keyword in question.lower() for keyword in keywords])
-
     def __provide_text_answer__(self, question: str, ray_logger: LogLLMRayCallbackHandler) -> str:
         last_prompt_saver = LastPromptSaverCallbackHandler()
         sql_agent_chain = self.__build_sql_agent_chain__(
@@ -102,7 +117,6 @@ class Brain:
             chains=[sql_agent_chain, lang_translator_chain],
             verbose=self._verbose,)
 
-        ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path)
         with get_openai_callback() as openai_cb:
             try:
                 response = overall_chain.run(
@@ -110,36 +124,19 @@ class Brain:
                     callbacks=[last_prompt_saver, ray_logger, *self._inheritable_llm_callbacks],)
             except OutputParserException as e:
                 logger.error("Parser cannot parse AI answer", exc_info=True)
-                e = add_info_to_exception(
-                    e, "ray_id", ray_logger.get_ray_str())
+                e = add_info_to_exception(e, "ray_id", ray_logger.get_ray_str())
                 raise e
             except InvalidRequestError as e:
                 logger.error("Error while asking OpenAI", exc_info=True)
-                e = add_info_to_exception(
-                    e, "ray_id", ray_logger.get_ray_str())
+                e = add_info_to_exception(e, "ray_id", ray_logger.get_ray_str())
                 raise e
             except Exception as e:
-                e = add_info_to_exception(
-                    e, "ray_id", ray_logger.get_ray_str())
+                e = add_info_to_exception(e, "ray_id", ray_logger.get_ray_str())
                 raise e
             logger.info(openai_cb)
 
-        if not ray_logger.brain_response_data.sql_script:
-            ray_logger.brain_response_data.sql_script = None
-            self.sql_script = None
-        else:
-            self.sql_script = ray_logger.brain_response_data.sql_script
-        try:
-            with self.engine.Session() as session:
-                session.add(ray_logger.brain_response_data)
-                session.commit()
-        except Exception as e:
-            logger.error("failed to write to database", exc_info=True)
-            e = add_info_to_exception(
-                e, "ray_id", ray_logger.get_ray_str())
-            raise e
-        return self.Answer(ray_logger.get_ray_str(),answer_text = response, sql_script = self.sql_script, )
-
+        return response
+    
     def __build_sql_llm_toolkit(
         self,
         db_hints_doc_path: str = None,

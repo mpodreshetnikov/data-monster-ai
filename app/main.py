@@ -31,9 +31,7 @@ def main():
     if run_in_console:
         __run_bot_in_console_and_block_thread__(brain)
 
-    tg_bot_token = config.get("tg", "bot_token")
-    tg_users_whitelist = config.get("tg", "whitelist").split(",")
-    tg.run_bot_and_block_thread(config, brain, engine)
+    __run_bot_and_block_thread__(config, brain, engine)
 
 
 def __run_bot_in_console_and_block_thread__(brain: Brain):
