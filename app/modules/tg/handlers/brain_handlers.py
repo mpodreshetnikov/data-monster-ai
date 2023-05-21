@@ -1,8 +1,7 @@
 import logging
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram import Update
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import Application, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
 
@@ -12,8 +11,11 @@ from modules.tg.utils.time_watching import ExecInfoStorage
 
 from modules.brain.main import Brain
 
+
 from modules.data_access.main import Engine
 from modules.data_access.models.brain_response_data import BrainResponseData
+from ..web_app.main import WebApp, WebAppTypes
+
 
 
 logger = logging.getLogger(__name__)
@@ -21,15 +23,17 @@ logger = logging.getLogger(__name__)
 SQL_CALLBACK_PATTERN = 'sql'
 
 
-def add_handlers(application: Application, brain: Brain, engine: Engine):
+def add_handlers(application: Application, brain: Brain, web_app_base_url: str, engine: Engine):
     application.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND, __get__ask_brain_handler__(brain)))
+        filters.TEXT & ~filters.COMMAND, __get__ask_brain_handler__(brain, web_app_base_url)))
 
     application.add_handler(CallbackQueryHandler(
         lambda update, context: sql_button(update, context, engine), pattern=SQL_CALLBACK_PATTERN))
 
+def __get__ask_brain_handler__(brain: Brain, web_app_base_url: str) -> None:
+    if not web_app_base_url:
+        logger.warning("No web_app_base_url provided, chart page will not be available")
 
-def __get__ask_brain_handler__(brain: Brain) -> None:
     exec_info_storage = ExecInfoStorage(count=10)
 
     @a_only_allowed_users
@@ -51,22 +55,42 @@ def __get__ask_brain_handler__(brain: Brain) -> None:
 
         exec_info_storage_key = f"{chat_id}_{user_id}"
         exec_info_storage.start(exec_info_storage_key)
+        # --- START OF ANSWERING BODY
 
         answer = brain.answer(question)
 
         logger.info(
             f"User {update.effective_user.username}:{update.effective_user.id} got brain answer: {str(answer.text)}")
 
+        if answer.sql_script is not None:
+            sql_button = InlineKeyboardButton(
+                "SQL", callback_data=f'{SQL_CALLBACK_PATTERN}:{answer.ray_id}')
+
+        if answer.chart_code and web_app_base_url:
+            web_app = WebApp(WebAppTypes.ChartPage, web_app_base_url)
+            page_url = web_app.create_and_save(question=answer.question, js_code_insertion=answer.chart_code)
+            chart_button = InlineKeyboardButton(
+                text=message_text_for("answer_open_chart_button"),
+                web_app=WebAppInfo(url=page_url)
+            )
+
+        keyboard = []
+        if sql_button:
+            keyboard.append([sql_button])
+        if chart_button:
+            keyboard.append([chart_button])
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
         exec_info_storage.stop(exec_info_storage_key)
+        
+        await context.bot.send_message(
+            chat_id,
+            message_text_for("answer_with_ray_id", answer=answer.answer_text, ray_id=answer.ray_id),
+            parse_mode="HTML",
+            reply_markup=reply_markup
+        )
 
-        if answer.sql_script == None:
-            pass
-        else:
-            keyboard = [[InlineKeyboardButton(
-                "SQL", callback_data=f'{SQL_CALLBACK_PATTERN}:{answer.ray_id}')]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await context.bot.send_message(chat_id, message_text_for("answer_with_ray_id", answer=answer.text, ray_id=answer.ray_id), parse_mode="HTML",  reply_markup=reply_markup)
         await context.bot.send_message(chat_id, message_text_for("continue_dialog"), parse_mode="HTML")
 
     return __ask_brain_handler__

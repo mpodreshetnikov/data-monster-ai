@@ -31,9 +31,11 @@ logger = logging.getLogger(__name__)
 class Brain:
     @dataclass
     class Answer:
+        question: str
         ray_id: str
-        text: str
-        sql_script: str
+        answer_text: str = None
+        chart_code: str = None
+        sql_script: str = None
 
     db: SQLDatabase
     default_llm: BaseLanguageModel
@@ -76,6 +78,21 @@ class Brain:
             db_hints_doc_path, sql_query_examples_path)
 
     def answer(self, question: str) -> Answer:
+        ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path)
+        answer = self.Answer(question, ray_logger.get_ray_str())
+        answer.answer_text = self.__provide_text_answer__(question, ray_logger)
+        if self.__is_chart_needed__(question):
+            answer.chart_code = self.__provide_chart_code__()
+        return answer
+
+    def __provide_chart_code__(self) -> str:
+        return "TODO"
+
+    def __is_chart_needed__(self, question: str) -> bool:
+        keywords = ["chart", "plot", "graph", "график", "диаграмма", "построить"]
+        return any([keyword in question.lower() for keyword in keywords])
+
+    def __provide_text_answer__(self, question: str, ray_logger: LogLLMRayCallbackHandler) -> str:
         last_prompt_saver = LastPromptSaverCallbackHandler()
         sql_agent_chain = self.__build_sql_agent_chain__(
             question, last_prompt_saver)
@@ -121,7 +138,7 @@ class Brain:
             e = add_info_to_exception(
                 e, "ray_id", ray_logger.get_ray_str())
             raise e
-        return self.Answer(ray_logger.get_ray_str(), response, self.sql_script, )
+        return self.Answer(ray_logger.get_ray_str(),answer_text = response, sql_script = self.sql_script, )
 
     def __build_sql_llm_toolkit(
         self,

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Telegram Web App Chart</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.3.0/chart.umd.min.js" integrity="sha512-TJ7U6JRJx5IpyvvO9atNnBzwJIoZDaQnQhb0Wmw32Rj5BQHAmJG16WzaJbDns2Wk5VG6gMt4MytZApZG47rCdg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js" integrity="sha512-UXumZrZNiOwnTcZSHLOfcTs0aos2MzBWHXOHOuB0J/R44QB0dwY5JgfbvljXcklVf65Gc4El6RjZ+lnwd2az2g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js" integrity="sha512-wUYbRPLV5zs6IqvWd88HIqZU/b8TBx+I8LEioQ/UC0t5EMCLApqhIAnUg7EsAzdbhhdgW07TqYDdH3QEXRcPOQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+<script type="text/javascript">
+    <!-- Chart generating code here -->
+    const data = {
+        labels: ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июль', 'Август'],
+        datasets: [
+            {
+                label: 'Количество продаж',
+                data: [10000, 8800, 7300, 12200, 8900, 9300, 8200],
+            },
+        ]
+    };
+    const config = {
+        type: 'line',
+        data: data,
+    };
+</script>
+<style>
+    body {
+        background-color: var(--tg-theme-secondary-bg-color);
+        color: var(--tg-theme-text-color);
+    }
+
+    #chart-container {
+        background-color: var(--tg-theme-bg-color);
+        width: 100%;
+        height: calc(var(--tg-viewport-stable-height) - 30px);
+    }
+</style>
+<body>
+    <div id="chart-container">
+        <canvas id="chart"></canvas>
+    </div>
+</body>
+<script type="text/javascript">
+    const telegram = Telegram.WebApp
+    telegram.ready();
+    telegram.MainButton.setText('Закрыть').show().onClick(function () {
+        telegram.close();
+    });
+
+    config.options = {
+            maintainAspectRatio: false,
+            responsive: true,
+            scales: {
+                    x: {
+                        ticks: {
+                            color: telegram.themeParams.text_color
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            color: telegram.themeParams.text_color
+                        }
+                    }
+                },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'График количества продаж по месяцам за 2023 год'
+                },
+                legend: {
+                    labels: {
+                        color: telegram.themeParams.text_color || '#fff'
+                    }
+                },
+                zoom: {
+                    zoom: {
+                        wheel: {
+                            enabled: true,
+                        },
+                        pinch: {
+                            enabled: true
+                        },
+                        mode: 'xy',
+                    }
+                },
+            },
+        };
+    const setup_plugin = {
+        id: 'customCanvasBackgroundColor',
+        beforeDraw: (chart, args, options) => {
+            const {ctx} = chart;
+            ctx.save();
+            ctx.globalCompositeOperation = 'destination-over';
+            ctx.fillStyle = telegram.themeParams.bg_color;
+            ctx.fillRect(0, 0, chart.width, chart.height);
+            ctx.restore();
+            
+            Chart.defaults.color = telegram.themeParams.text_color || '#fff';
+        }
+    };
+    config.plugins = [setup_plugin];
+
+    const canvas = document.getElementById('chart');
+    let chart = new Chart(canvas, config);
+
+    telegram.onEvent('themeChanged', function () {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        chart.destroy();
+        chart = new Chart(canvas, config);
+    })
+</script>
+<script type="text/javascript">
+    telegram.expand();
+</script>
+</html>
