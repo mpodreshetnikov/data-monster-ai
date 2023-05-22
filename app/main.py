@@ -21,7 +21,7 @@ def main():
     config.read(os.path.join(__location__, "settings.ini"))
 
     __configure_logger__(config)
-    engine = __configure_engine(config)
+    engine = __configure_engine__(config)
 
     brain = __configure_brain__(config)
     brain.engine = engine
@@ -106,7 +106,7 @@ def __configure_logger__(config: ConfigParser, log_filename: str = 'log.txt'):
         root_logger.addHandler(console_handler)
 
 
-def __configure_engine(config: ConfigParser) -> Engine:
+def __configure_engine__(config: ConfigParser) -> Engine:
     url = URL.create(
         drivername=config.get("engine", "drivername", fallback="sqlite"),
         username=config.get("engine", "username"),
