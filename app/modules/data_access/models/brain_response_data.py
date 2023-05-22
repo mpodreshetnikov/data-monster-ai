@@ -1,5 +1,5 @@
-from sqlalchemy import Column, String, ForeignKey
-from modules.data_access.main import Base
+from sqlalchemy import Column, String
+from .base import Base
 
 
 class BrainResponseData(Base):
