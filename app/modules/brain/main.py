@@ -102,7 +102,6 @@ class Brain:
             logger.error("failed to write to database", exc_info=True)
             e = add_info_to_exception(
                 e, "ray_id", ray_id)
-            raise e
 
     def __is_chart_needed__(self, question: str) -> bool:
         keywords = ["chart", "plot", "graph", "график", "диаграмма", "построить"]
