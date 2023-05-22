@@ -7,3 +7,4 @@ SQLAlchemy==2.0.11
 psycopg2-binary==2.9.6
 chromadb==0.3.22
 tiktoken==0.4.0
+sqlalchemy_utils==0.41.1

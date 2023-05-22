@@ -4,21 +4,25 @@ from langchain.callbacks.base import BaseCallbackHandler
 from langchain.schema import LLMResult
 from pydantic import Field
 import time
+import uuid
 
-from base64 import b32encode
-from os import urandom
+from modules.data_access.models.brain_response_data import BrainResponseData
 
 
 class LogLLMRayCallbackHandler(BaseCallbackHandler):
     log_path: str = Field()
     ray_id: str = Field()
+    sql_script: str = Field()
 
     def __init__(self, log_path: str) -> None:
         self.log_path = log_path
-        self.ray_id = str(b32encode(urandom(10))).replace("b'", "").replace("'", "")
-        
+        self.ray_id = str(uuid.uuid4())
+
     def get_ray_str(self) -> str:
         return self.ray_id
+
+    def get_sql_script(self) -> str:
+        return self.sql_script
 
     def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], *, run_id: UUID, parent_run_id: UUID | None = None, **kwargs: Any) -> Any:
         if self.log_path:
@@ -27,10 +31,14 @@ class LogLLMRayCallbackHandler(BaseCallbackHandler):
             with open(self.log_path, "a", encoding="utf-8") as f:
                 f.write(header_str)
                 f.write(prompt)
-    
+
     def on_llm_end(self, response: LLMResult, *, run_id: UUID, parent_run_id: UUID | None = None, **kwargs: Any) -> Any:
         if self.log_path:
             header_str = f"\n-------------{time.asctime()}-{self.ray_id}-LLM Responce-------------\n"
             with open(self.log_path, "a", encoding="utf-8") as f:
                 f.write(header_str)
                 f.write(str(response))
+
+    def on_tool_start(self, serialized: Dict[str, Any], input_str: str, *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any,) -> None:
+        if serialized["name"] == "query_sql_db":
+            self.sql_script = input_str

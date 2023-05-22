@@ -6,7 +6,6 @@ from telegram import Update
 from modules.tg.utils.texts import message_text_for
 from modules.tg.utils.decorators import a_only_allowed_users
 
-
 logger = logging.getLogger(__name__)
 
 

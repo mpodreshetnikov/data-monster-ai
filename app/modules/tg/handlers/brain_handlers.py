@@ -1,7 +1,9 @@
 import logging
 
-from telegram.ext import Application, MessageHandler, ContextTypes, filters
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
+from telegram.ext import Application, MessageHandler, CallbackQueryHandler, ContextTypes, filters
+
 
 from modules.tg.utils.texts import message_text_for
 from modules.tg.utils.decorators import a_only_allowed_users
@@ -9,29 +11,41 @@ from modules.tg.utils.time_watching import ExecInfoStorage
 
 from modules.brain.main import Brain
 
+
+from modules.data_access.main import Engine
+from modules.data_access.models.brain_response_data import BrainResponseData
 from ..web_app.main import WebApp, WebAppTypes
 
 
 logger = logging.getLogger(__name__)
 
+SQL_CALLBACK_PATTERN = 'sql'
 
-def add_handlers(application: Application, brain: Brain, web_app_base_url: str):
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, __get__ask_brain_handler__(brain, web_app_base_url)))
+
+def add_handlers(application: Application, brain: Brain, engine: Engine, web_app_base_url: str):
+    application.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND, __get__ask_brain_handler__(brain, web_app_base_url)))
+
+    application.add_handler(CallbackQueryHandler(
+        lambda update, context: show_sql_callback(update, context, engine), pattern=SQL_CALLBACK_PATTERN))
 
 
 def __get__ask_brain_handler__(brain: Brain, web_app_base_url: str) -> None:
     if not web_app_base_url:
-        logger.warning("No web_app_base_url provided, chart page will not be available")
+        logger.warning(
+            "No web_app_base_url provided, chart page will not be available")
 
     exec_info_storage = ExecInfoStorage(count=10)
-    
+
     @a_only_allowed_users
     async def __ask_brain_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id
         user_id = update.effective_user.id
-        question = " ".join(context.args) if context.args else update.message.text
-        
-        logger.info(f"User {update.effective_user.username}:{update.effective_user.id} asked a question {question}")
+        question = " ".join(
+            context.args) if context.args else update.message.text
+
+        logger.info(
+            f"User {update.effective_user.username}:{update.effective_user.id} asked a question {question}")
 
         if exec_info_storage:
             seconds = exec_info_storage.average()
@@ -42,26 +56,68 @@ def __get__ask_brain_handler__(brain: Brain, web_app_base_url: str) -> None:
 
         exec_info_storage_key = f"{chat_id}_{user_id}"
         exec_info_storage.start(exec_info_storage_key)
-        # --- START OF ANSWERING BODY
 
         answer = brain.answer(question)
-        logger.info(f"User {update.effective_user.username}:{update.effective_user.id} got brain answer: {str(answer.answer_text)}")
-        
+
+        logger.info(
+            f"User {update.effective_user.username}:{update.effective_user.id} got brain answer: {str(answer.answer_text)}")
+
+        sql_button = None
+        chart_button = None
+
+        if answer.sql_script is not None:
+            sql_button = InlineKeyboardButton(
+                text=message_text_for("answer_show_sql_button"), callback_data=f'{SQL_CALLBACK_PATTERN}:{answer.ray_id}')
+
         if answer.chart_code and web_app_base_url:
             web_app = WebApp(WebAppTypes.ChartPage, web_app_base_url)
-            page_url = web_app.create_and_save(question=answer.question, js_code_insertion=answer.chart_code)
-            web_app_button = InlineKeyboardButton(
+            page_url = web_app.create_and_save(
+                question=answer.question, js_code_insertion=answer.chart_code)
+            chart_button = InlineKeyboardButton(
                 text=message_text_for("answer_open_chart_button"),
-                web_app=WebAppInfo(url=page_url),
+                web_app=WebAppInfo(url=page_url)
             )
 
-        # --- END OF ANSWERING BODY
+        keyboard = []
+        if sql_button:
+            keyboard.append([sql_button])
+        if chart_button:
+            keyboard.append([chart_button])
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
         exec_info_storage.stop(exec_info_storage_key)
-        
-        await context.bot.send_message(chat_id,
-                                       message_text_for("answer_with_ray_id", answer=answer.answer_text, ray_id=answer.ray_id),
-                                       parse_mode="HTML",
-                                       reply_markup=InlineKeyboardMarkup.from_button(web_app_button) if answer.chart_code else None)
+
+        await context.bot.send_message(
+            chat_id,
+            message_text_for("answer_with_ray_id",
+                             answer=answer.answer_text, ray_id=answer.ray_id),
+            parse_mode="HTML",
+            reply_markup=reply_markup
+        )
+
         await context.bot.send_message(chat_id, message_text_for("continue_dialog"), parse_mode="HTML")
-        
+
     return __ask_brain_handler__
+
+
+async def show_sql_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, engine: Engine):
+    query = update.callback_query
+    answer_without_sql = query.message.text
+    callback_data = query.data
+    _, ray_id = callback_data.split(":")
+
+    with engine.Session() as session:
+        brain_response_data = session.query(
+            BrainResponseData).filter_by(ray_id=ray_id).first()
+        reply_markup = query.message.reply_markup
+        keyboard_without_sql = [
+            button for button in reply_markup.inline_keyboard if button[0].text != message_text_for("answer_show_sql_button")]
+        if brain_response_data:
+            answer_with_sql = message_text_for(
+                'answer_with_sql_script', answer=answer_without_sql, sql_script=brain_response_data.sql_script)
+            await query.edit_message_text(text=answer_with_sql)
+        else:
+            error_message = f"\nПроизошла ошибка и sql-запрос к сожалению утерян"
+            await query.edit_message_text(text=error_message)
+        await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard_without_sql))
