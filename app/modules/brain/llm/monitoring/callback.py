@@ -5,6 +5,7 @@ from langchain.schema import LLMResult
 from pydantic import Field
 import time
 import uuid
+from langchain.tools.sql_database.tool import QuerySQLDataBaseTool
 
 from modules.data_access.models.brain_response_data import BrainResponseData
 
@@ -40,5 +41,5 @@ class LogLLMRayCallbackHandler(BaseCallbackHandler):
                 f.write(str(response))
 
     def on_tool_start(self, serialized: Dict[str, Any], input_str: str, *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any,) -> None:
-        if serialized["name"] == "query_sql_db":
+        if serialized["name"] == QuerySQLDataBaseTool.name:
             self.sql_script = input_str
