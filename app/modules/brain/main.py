@@ -84,10 +84,10 @@ class Brain:
         answer = self.Answer(question, ray_logger.get_ray_str())
         answer.answer_text = self.__provide_text_answer__(question, ray_logger)
         answer.sql_script = ray_logger.get_sql_script()
-        
+
         if self.__is_chart_needed__(question):
             answer.chart_code = self.__provide_chart_code__()
-            
+
         self.__save_brain_response__(answer.ray_id, answer.sql_script)
         return answer
 
@@ -97,15 +97,18 @@ class Brain:
     def __save_brain_response__(self, ray_id, sql_script) -> None:
         try:
             with self.engine.Session() as session:
-                brain_response_data = BrainResponseData(ray_id=ray_id, sql_script = sql_script)
+                brain_response_data = BrainResponseData(
+                    ray_id=ray_id, sql_script=sql_script)
                 session.add(brain_response_data)
                 session.commit()
         except Exception as e:
             logger.error("failed to write to database", exc_info=True)
 
     def __is_chart_needed__(self, question: str) -> bool:
-        keywords = ["chart", "plot", "graph", "график", "диаграмма", "построить"]
+        keywords = ["chart", "plot", "graph", "график",
+                    "диаграмма", "построить"]
         return any([keyword in question.lower() for keyword in keywords])
+
     def __provide_text_answer__(self, question: str, ray_logger: LogLLMRayCallbackHandler) -> str:
         last_prompt_saver = LastPromptSaverCallbackHandler()
         sql_agent_chain = self.__build_sql_agent_chain__(
@@ -123,19 +126,22 @@ class Brain:
                     callbacks=[last_prompt_saver, ray_logger, *self._inheritable_llm_callbacks],)
             except OutputParserException as e:
                 logger.error("Parser cannot parse AI answer", exc_info=True)
-                e = add_info_to_exception(e, "ray_id", ray_logger.get_ray_str())
+                e = add_info_to_exception(
+                    e, "ray_id", ray_logger.get_ray_str())
                 raise e
             except InvalidRequestError as e:
                 logger.error("Error while asking OpenAI", exc_info=True)
-                e = add_info_to_exception(e, "ray_id", ray_logger.get_ray_str())
+                e = add_info_to_exception(
+                    e, "ray_id", ray_logger.get_ray_str())
                 raise e
             except Exception as e:
-                e = add_info_to_exception(e, "ray_id", ray_logger.get_ray_str())
+                e = add_info_to_exception(
+                    e, "ray_id", ray_logger.get_ray_str())
                 raise e
             logger.info(openai_cb)
 
         return response
-    
+
     def __build_sql_llm_toolkit(
         self,
         db_hints_doc_path: str = None,
