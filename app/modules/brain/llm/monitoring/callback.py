@@ -43,7 +43,7 @@ class LogLLMRayCallbackHandler(BaseCallbackHandler):
             with open(self.log_path, "a", encoding="utf-8") as f:
                 f.write(header_str)
                 f.write(str(response))
-
+    
     def on_tool_start(self, serialized: Dict[str, Any], input_str: str, *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any,) -> None:
-        if serialized["name"] == QuerySQLDataBaseTool.name:
-            self.sql_script = input_str
+        if serialized["name"] == "query_sql_db":
+            self.sql_script = "\n".join(line for line in input_str.splitlines() if line.strip())
