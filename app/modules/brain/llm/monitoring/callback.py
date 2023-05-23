@@ -23,6 +23,10 @@ class LogLLMRayCallbackHandler(BaseCallbackHandler):
         return self.ray_id
 
     def get_sql_script(self) -> str:
+        """
+        Returns the SQL script.
+        Note: It makes sense to call the method only after llm has completed.
+        """
         return self.sql_script
 
     def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], *, run_id: UUID, parent_run_id: UUID | None = None, **kwargs: Any) -> Any:
