@@ -103,6 +103,7 @@ def __get__ask_brain_handler__(brain: Brain, web_app_base_url: str) -> None:
 
 async def show_sql_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, engine: Engine):
     query = update.callback_query
+    await query.answer()
     answer_without_sql = query.message.text
     callback_data = query.data
     _, ray_id = callback_data.split(":")
@@ -113,11 +114,10 @@ async def show_sql_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         reply_markup = query.message.reply_markup
         keyboard_without_sql = [
             button for button in reply_markup.inline_keyboard if button[0].text != message_text_for("answer_show_sql_button")]
-        if brain_response_data:
+        if brain_response_data and brain_response_data.sql_script:
             answer_with_sql = message_text_for(
                 'answer_with_sql_script', answer=answer_without_sql, sql_script=brain_response_data.sql_script)
             await query.edit_message_text(text=answer_with_sql)
         else:
-            error_message = f"\nПроизошла ошибка и sql-запрос к сожалению утерян"
-            await query.edit_message_text(text=error_message)
+            await query.edit_message_text(text=message_text_for("not_found_script_error"))
         await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard_without_sql))
