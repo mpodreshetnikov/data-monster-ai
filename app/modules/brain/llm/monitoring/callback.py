@@ -5,9 +5,6 @@ from langchain.schema import LLMResult
 from pydantic import Field
 import time
 import uuid
-from langchain.tools.sql_database.tool import QuerySQLDataBaseTool
-
-from modules.data_access.models.brain_response_data import BrainResponseData
 
 
 class LogLLMRayCallbackHandler(BaseCallbackHandler):
