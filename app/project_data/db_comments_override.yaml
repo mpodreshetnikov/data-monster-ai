@@ -1,0 +1,10 @@
+tables:
+  - name: uas_data_user
+    comment: New comment user
+    columns:
+      - name: position
+        comment: New comment position
+      - name: name
+        comment: New comment name
+  - name: uas_cash_cheque
+    comment: New comment cheque

@@ -23,6 +23,8 @@ class ListSQLDatabaseWithCommentsTool(ListSQLDatabaseTool):
     cache_key: str = ""
     cache: str = ""
 
+    db_comments_override: list = Field(default=None, description="Override for the database comments")
+
     def _run(
         self,
         tool_input: str = "",
@@ -41,7 +43,9 @@ class ListSQLDatabaseWithCommentsTool(ListSQLDatabaseTool):
 
         table_strings = []
         for table in tables_to_take:
-            comment = self.db._inspector.get_table_comment(table, schema=self.db._schema)["text"]
+            db_comment = self.db._inspector.get_table_comment(table, schema=self.db._schema)["text"]
+            override_comment = self.__get_override_table_comment(table)
+            comment = override_comment if override_comment else db_comment
             if comment:
                 table_strings.append(f"{table} ({comment})")
             else:
@@ -52,6 +56,14 @@ class ListSQLDatabaseWithCommentsTool(ListSQLDatabaseTool):
         self.cache = value
 
         return value
+    
+    def __get_override_table_comment(self, table_name):
+        if not self.db_comments_override:
+            return None
+        for table in self.db_comments_override:
+            if table["name"] == table_name:
+                return table["comment"]
+        return None
 
 
 
@@ -61,6 +73,8 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
     Be sure that the table actually exists and don't ask more than one table.
     You cannot ask all the tables via this tool. If you want to get all the available tables, use 'list_tables_sql_db' tool.
     """
+
+    db_comments_override: list = Field(default=None, description="Override for the database comments")
 
     def _run(
         self,
@@ -98,9 +112,12 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
 
                 # add column comments
                 for column in table.columns:
-                    if column.comment:
+                    db_comment = column.comment
+                    override_comment = self.__get_override_column_comment(table.name, column.name)
+                    comment = override_comment if override_comment else db_comment
+                    if comment:
                         f_pattern = r"(\s" + column.name + r"\s[^,\n]*)(,?\n?)"
-                        s_pattern = r"\1 COMMENT '" + column.comment + r"'\2"
+                        s_pattern = r"\1 COMMENT '" + comment + r"'\2"
                         table_info = re.sub(f_pattern, s_pattern, table_info, count=1)
                 tables.append(table_info)
 
@@ -121,6 +138,19 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
         except ValueError as e:
             """Format the error message"""
             return f"Error: {e}"
+
+
+    def __get_override_column_comment(self, table_name, column_name):
+        if not self.db_comments_override:
+            return None
+        for table in self.db_comments_override:
+            if table["name"] == table_name:
+                if not table.get("columns"):
+                    return None
+                for column in table["columns"]:
+                    if column["name"] == column_name:
+                        return column["comment"]
+        return None
 
 
 class LightweightQuerySQLDataBaseTool(QuerySQLDataBaseTool):
@@ -153,11 +183,11 @@ class SQLDatabaseToolkitModified(BaseToolkit):
 
         arbitrary_types_allowed = True
 
-    def get_tools(self) -> list[BaseTool]:
+    def get_tools(self, db_comments_override: dict) -> list[BaseTool]:
         """Get the tools in the toolkit."""
         return [
             LightweightQuerySQLDataBaseTool(db=self.db),
-            InfoSQLDatabaseWithCommentsTool(db=self.db),
-            ListSQLDatabaseWithCommentsTool(db=self.db),
+            InfoSQLDatabaseWithCommentsTool(db=self.db, db_comments_override=db_comments_override),
+            ListSQLDatabaseWithCommentsTool(db=self.db, db_comments_override=db_comments_override),
             # QueryCheckerTool(db=self.db, llm=self.llm),
         ]

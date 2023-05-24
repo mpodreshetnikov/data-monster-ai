@@ -1,3 +1,4 @@
+import yaml
 from pydantic import Field
 
 from langchain.agents.agent_toolkits.base import BaseToolkit
@@ -22,6 +23,7 @@ DB_HINT_UNKNOWN_PHRASES = [
 
 class DbDataInteractionToolkit(SQLDatabaseToolkitModified, BaseToolkit):
     db_hints_doc_path: str = Field(default=None, description="Path to the database documentation")
+    db_comments_override_path: str = Field(default=None, description="Path to the YAML file with the database comments")
     sql_query_examples_path: str = Field(default=None, description="Path to the YAML file with the query examples")
     llm: BaseLanguageModel = Field()
     embeddings: Embeddings = Field()
@@ -35,7 +37,10 @@ class DbDataInteractionToolkit(SQLDatabaseToolkitModified, BaseToolkit):
         self.available_tools = []
 
         # add tools available for agent
-        self.available_tools.extend(SQLDatabaseToolkitModified.get_tools(self))
+        if self.db_comments_override_path:
+            with open(self.db_comments_override_path, "r", encoding="utf-8") as f:
+                db_comments_override = yaml.safe_load(f)["tables"]
+        self.available_tools.extend(SQLDatabaseToolkitModified.get_tools(self, db_comments_override=db_comments_override))
 
         # add all tools available in a script
         self.all_tools.extend(self.available_tools)

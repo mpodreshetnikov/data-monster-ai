@@ -56,6 +56,7 @@ class Brain:
         llm: BaseLanguageModel = None,
         embeddings: Embeddings = None,
         db_hints_doc_path: str = None,
+        db_comments_override_path: str = None,
         sql_query_examples_path: str = None,
         sql_query_hints_limit: int = 0,
         sql_agent_max_iterations: int = 5,
@@ -77,7 +78,7 @@ class Brain:
             logger.warning("No llm provided, using default ChatOpenAI")
         self.default_llm = llm or ChatOpenAI(verbose=self._verbose)
         self._default_sql_llm_toolkit = self.__build_sql_llm_toolkit(
-            db_hints_doc_path, sql_query_examples_path)
+            db_hints_doc_path, db_comments_override_path, sql_query_examples_path)
 
     def answer(self, question: str) -> Answer:
         ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path)
@@ -139,6 +140,7 @@ class Brain:
     def __build_sql_llm_toolkit(
         self,
         db_hints_doc_path: str = None,
+        db_comments_override_path: str = None,
         sql_query_examples_path: str = None,
         llm: BaseLanguageModel = None,
     ) -> BaseToolkit:
@@ -147,6 +149,7 @@ class Brain:
             llm=llm or self.default_llm,
             embeddings=self.default_embeddings,
             db_hints_doc_path=db_hints_doc_path,
+            db_comments_override_path=db_comments_override_path,
             sql_query_examples_path=sql_query_examples_path,
         )
         with get_openai_callback() as openai_cb:
