@@ -53,6 +53,7 @@ def __configure_brain__(config: ConfigParser) -> Brain:
         db=db,
         llm=llm,
         db_hints_doc_path=config.get("hints", "db_hints_doc_path"),
+        db_comments_override_path=config.get("hints", "db_comments_override_path"),
         prompt_log_path=config.get("debug", "prompt_log_path"),
         sql_query_examples_path=config.get("hints", "sql_query_examples_path"),
         sql_query_hints_limit=config.getint(

@@ -1,0 +1,141 @@
+tables:
+  - name: uas_cash_cheque
+    comment: Таблица содержит информацию о чеках. Каждая запись в этой таблице представляет собой один чек
+    columns:
+      - name: xml_buffer_cd
+        comment: Содержимое чека в формате XML
+      - name: cheque_id
+        comment: Идентификатор чека
+      - name: num
+        comment: Номер чека
+      - name: num_kkt
+        comment: Номер кассового аппарата, используемого для создания этого чека
+      - name: cash_session_id
+        comment: Идентификатор сеанса, в котором был создан этот чек
+      - name: owner_id
+        comment: Идентификатор аптеки, к которой относится этот чек
+      - name: cashbox_id
+        comment: Идентификатор кассового аппарата, использованного для этого чека
+      - name: dt_create
+        comment: Дата и время создания этого чека
+      - name: dt_pay
+        comment: Дата и время оплаты за этот чек
+      - name: type
+        comment: Тип чека (Чек оплаты / Чек возврата / Отложенный чек)
+      - name: user_id
+        comment: Id сотрудника/рабочего
+      - name: result
+        comment: Сумма чека/платежа/продажи
+      - name: sdacha
+        comment: Сдача
+      - name: discunt
+        comment: Сумма скидки
+      - name: bank_card_num
+        comment: Номер банковской карты. Не является типом оплаты
+      - name: return_check_id
+        comment: Ссылка на таблицу uas_cash_cheque
+  - name: uas_cash_cheque_item
+    comment: Таблица содержит информацию о каждом товаре, проданном в магазине и добавленном в чек, и примененные акции/скидки
+    columns:
+      - name: cheque_id
+        comment: Идентификатор чека, к которому относится этот товар
+      - name: nomencl_id
+        comment: Идентификатор товара в каталоге продуктов магазина. Ссылка на таблицу uas_data_med_nomenclature
+      - name: series_id
+        comment: Идентификатор серии (партии), к которой относится этот товар
+      - name: pack_unit_id
+        comment: Id единицы измерения (например, коробка, бутылка, штука и т.д.)
+      - name: qty
+        comment: Количество товара в чеке
+      - name: price
+        comment: Цена за этот товар
+      - name: discount
+        comment: id скидки/акции, примененная к этому товару
+      - name: result
+        comment: Итоговая сумма
+      - name: goscontr_id
+        comment: дентификатор государственного контракта
+      - name: discont_type
+        comment: Тип скидки/акции,
+      - name: discont_name
+        comment: Название скидки/акции,
+      - name: discount_id
+        comment: Идентификатор скидки
+      - name: nds_sum
+        comment: Сумма налога на добавленную стоимость
+      - name: pos_id
+        comment: Позиция (номер) этого товара на чеке
+  - name: uas_cash_cheque_sum
+    comment: Таблица содержит информацию о сумме платежа/продажи и типе оплаты для каждого чека
+    columns:
+      - name: check_id
+        comment: id чека
+      - name: sum
+        comment: Сумма чека/продажи
+      - name: sum_type
+        comment: "Тип оплаты чека: Нал/Безнал/sber/ОплатаЭвотор"
+  - name: uas_cash_session_doc
+    comment: открытие и закрытие кассовых смен/касс/кассовых ссесий.
+    columns:
+      - name: session_id
+        comment: id кассовой сессии
+      - name: num_smena_kkt
+        comment: Номер кассовой смены
+      - name: dt_begin
+        comment: Дата и время открытия кассы в рамках сессии
+      - name: dt_end
+        comment: Время закрытия кассы в рамках сессии
+      - name: user_id
+        comment: Id сотрудника/продавца/рабочего
+      - name: cashbox_id
+        comment: Id кассы
+      - name: owner_id
+        comment: Id аптеки, внешний ключ к таблице uas_data_cnt_company
+      - name: owner_key
+        comment: Ключ аптеки, которой принадлежит данная сессия
+  - name: uas_data_cnt_company
+    comment: аптеки
+  - name: uas_data_med_nomenclature
+    comment: Таблица содержит информацию о медицинских продуктах, таких как лекарства и медицинские изделия. Каждая строка в таблице представляет собой отдельный элемент номенклатуры.
+    columns:
+      - name: kind_id
+        comment: Id категории
+      - name: productor_id
+        comment: Id производителя
+      - name: ga_potreb_cat_id
+        comment: Id категории, присвоенной правительством этому элементу
+      - name: pack_unit_id
+        comment: Id единицы измерения
+      - name: mark_id
+        comment: Id марки (бренда)
+      - name: mnn_id
+        comment: Id активного вещества
+      - name: atx_id
+        comment: Id анатомо-терапевтической классификации
+      - name: lf_id
+        comment: Id лекарственной формы
+      - name: lf_concentration
+        comment: Концентрация активного вещества
+      - name: lf_massa
+        comment: Вес активного веществ
+      - name: nds
+        comment: Ставка НДС
+      - name: cd
+        comment: Вторичный код
+      - name: dt_mod
+        comment: Дата последнего изменения
+      - name: dt_crt
+        comment: Дата создания
+      - name: pz_update
+        comment: Флаг, указывающий, требуется ли обновление
+  - name: uas_data_user
+    comment: Эта таблица содержит информацию об каждом сотруднике/продавце
+    columns:
+      - name: is_invalid
+        comment: Является ли учетная запись сотрудника недействительной\неактивной
+      - name: is_deleted
+        comment: была ли учетная запись сотрудника удалена из системы
+      - name: is_official
+        comment: Является ли сотрудник официальным\контрактным
+      - name: position
+        comment: Должность, занимаемая сотрудником
