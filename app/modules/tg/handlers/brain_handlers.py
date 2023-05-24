@@ -4,30 +4,28 @@ import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import Application, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
+import json
 
 from modules.tg.utils.texts import message_text_for
 from modules.tg.utils.decorators import a_only_allowed_users
 from modules.tg.utils.time_watching import ExecInfoStorage
 
 from modules.brain.main import Brain
-
-
-from modules.data_access.main import Engine
+from modules.data_access.main import InternalDB
 from modules.data_access.models.brain_response_data import BrainResponseData
 from ..web_app.main import WebApp, WebAppTypes
+from ..utils.button_id import ButtonId
 
 
 logger = logging.getLogger(__name__)
 
-SQL_CALLBACK_PATTERN = 'sql'
 
-
-def add_handlers(application: Application, brain: Brain, engine: Engine, web_app_base_url: str):
+def add_handlers(application: Application, brain: Brain, internal_db: InternalDB, web_app_base_url: str):
     application.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND, __get__ask_brain_handler__(brain, web_app_base_url)))
 
     application.add_handler(CallbackQueryHandler(
-        lambda update, context: show_sql_callback(update, context, engine), pattern=SQL_CALLBACK_PATTERN))
+        lambda update, context: show_sql_callback(update, context, internal_db)))
 
 
 def __get__ask_brain_handler__(brain: Brain, web_app_base_url: str) -> None:
@@ -67,7 +65,7 @@ def __get__ask_brain_handler__(brain: Brain, web_app_base_url: str) -> None:
 
         if answer.sql_script is not None:
             sql_button = InlineKeyboardButton(
-                text=message_text_for("answer_show_sql_button"), callback_data=f'{SQL_CALLBACK_PATTERN}:{answer.ray_id}')
+                text=message_text_for("answer_show_sql_button"), callback_data=json.dumps({"id": ButtonId.ID_SQL_BUTTON.value, "ray_id": answer.ray_id}))
 
         if answer.chart_code and web_app_base_url:
             web_app = WebApp(WebAppTypes.ChartPage, web_app_base_url)
@@ -75,16 +73,18 @@ def __get__ask_brain_handler__(brain: Brain, web_app_base_url: str) -> None:
                 question=answer.question, js_code_insertion=answer.chart_code)
             chart_button = InlineKeyboardButton(
                 text=message_text_for("answer_open_chart_button"),
+                callback_data=json.dumps(
+                    {"id": ButtonId.ID_CHART_BUTTON.value}),
                 web_app=WebAppInfo(url=page_url)
             )
 
         keyboard = []
         if sql_button:
-            keyboard.append([sql_button])
+            keyboard.append(sql_button)
         if chart_button:
-            keyboard.append([chart_button])
+            keyboard.append(chart_button)
 
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        reply_markup = InlineKeyboardMarkup([keyboard])
 
         exec_info_storage.stop(exec_info_storage_key)
 
@@ -101,19 +101,22 @@ def __get__ask_brain_handler__(brain: Brain, web_app_base_url: str) -> None:
     return __ask_brain_handler__
 
 
-async def show_sql_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, engine: Engine):
+async def show_sql_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, internal_db: InternalDB):
     query = update.callback_query
     await query.answer()
     answer_without_sql = query.message.text
-    callback_data = query.data
-    _, ray_id = callback_data.split(":")
+    callback_data = json.loads(query.data)
+    ray_id = callback_data['ray_id']
 
-    with engine.Session() as session:
+    with internal_db.Session() as session:
         brain_response_data = session.query(
             BrainResponseData).filter_by(ray_id=ray_id).first()
         reply_markup = query.message.reply_markup
-        keyboard_without_sql = [
-            button for button in reply_markup.inline_keyboard if button[0].text != message_text_for("answer_show_sql_button")]
+        keyboard_without_sql = []
+        for button_row in reply_markup.inline_keyboard:
+            for button in button_row:
+                if json.loads(button.callback_data)["id"] != ButtonId.ID_SQL_BUTTON.value:
+                    keyboard_without_sql.append(button)
         if brain_response_data and brain_response_data.sql_script:
             answer_with_sql = message_text_for(
                 'answer_with_sql_script', answer=answer_without_sql, sql_script=brain_response_data.sql_script)

@@ -6,8 +6,6 @@ from pydantic import Field
 import time
 import uuid
 
-from modules.data_access.models.brain_response_data import BrainResponseData
-
 
 class LogLLMRayCallbackHandler(BaseCallbackHandler):
     log_path: str = Field()
@@ -22,6 +20,10 @@ class LogLLMRayCallbackHandler(BaseCallbackHandler):
         return self.ray_id
 
     def get_sql_script(self) -> str:
+        """
+        Returns the SQL script.
+        Note: It makes sense to call the method only after llm has completed.
+        """
         return self.sql_script
 
     def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], *, run_id: UUID, parent_run_id: UUID | None = None, **kwargs: Any) -> Any:
@@ -41,4 +43,4 @@ class LogLLMRayCallbackHandler(BaseCallbackHandler):
 
     def on_tool_start(self, serialized: Dict[str, Any], input_str: str, *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any,) -> None:
         if serialized["name"] == "query_sql_db":
-            self.sql_script = input_str
+            self.sql_script = input_str.strip()

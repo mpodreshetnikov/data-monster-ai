@@ -11,7 +11,11 @@ bot_token = 12345678:AAAAAAAAAAAAAAAAAAA
 whitelist = tg_login,tg_login,tg_user_id
 web_app_storage_base_link = https://mpodreshetnikov.ru/gpt_bi_bot/tg_web_app_pages
 
-[db]
+[internal_db]
+drivername = sqlite
+database = name.sqlite
+
+[client_db]
 drivername = postgresql
 username = db_user
 password = qwerty12345
@@ -27,5 +31,6 @@ temperature = 0.7
 
 [hints]
 db_hints_doc_path = v2/test_scripts/db_hints.txt
+db_comments_override_path = app/project_data/db_comments_override.yaml
 sql_query_examples_path = v2/test_scripts/sql_query_examples.yaml
 query_hints_limit = 3

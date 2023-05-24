@@ -30,7 +30,7 @@ list:
       ON uas_cash_cheque.owner_id  = uas_data_cnt_company.cnt_company_id  
       WHERE uas_cash_cheque.cheque_id = 'c8a0f515-6dc3-44ba-a31e-430637f58712'
   - question: Сколько у аптеки 122 г Норильска продано Глицина?
-    tables: [uas_data_med_nomenclature, uas_data_cnt_company, uas_cash_cheque_item]
+    tables: [uas_data_med_nomenclature_todel, uas_data_cnt_company, uas_cash_cheque_item]
     query: |
       SELECT Count(*)
       FROM uas_cash_cheque 
@@ -38,7 +38,7 @@ list:
       ON ucsd.session_id = uas_cash_cheque.cash_session_id 
       JOIN uas_cash_cheque_item
       ON uas_cash_cheque_item.cheque_id = uas_cash_cheque.cheque_id 
-      JOIN uas_data_med_nomenclature udmn
+      JOIN uas_data_med_nomenclature_todel udmn
       ON udmn.nomenclature_id = uas_cash_cheque_item.nomencl_id 
       JOIN uas_data_cnt_company
       ON ucsd.owner_id = uas_data_cnt_company.cnt_company_id 
@@ -47,7 +47,7 @@ list:
         AND uas_data_cnt_company."name" ILIKE  '%аптека 122%' 
         AND uas_data_cnt_company."name" ILIKE  '%Норильск%' 
   - question: Сколько ежемесячно продаётся Нафтодерила
-    tables: [uas_data_med_nomenclature, uas_cash_cheque, uas_cash_cheque_item]
+    tables: [uas_data_med_nomenclature_todel, uas_cash_cheque, uas_cash_cheque_item]
     query: |
       SELECT
         DATE_TRUNC('month', uas_cash_cheque.dt_create) AS month,
@@ -55,9 +55,9 @@ list:
       FROM
         uas_cash_cheque
         JOIN uas_cash_cheque_item ON uas_cash_cheque.cheque_id = uas_cash_cheque_item.cheque_id
-        JOIN uas_data_med_nomenclature ON uas_cash_cheque_item.nomencl_id = uas_data_med_nomenclature.nomenclature_id     
+        JOIN uas_data_med_nomenclature_todel ON uas_cash_cheque_item.nomencl_id = uas_data_med_nomenclature_todel.nomenclature_id     
       WHERE
-        uas_data_med_nomenclature."name" ILIKE '%Нафтодерил%'
+        uas_data_med_nomenclature_todel."name" ILIKE '%Нафтодерил%'
       GROUP BY
         month
       ORDER BY

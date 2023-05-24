@@ -4,7 +4,7 @@ from sqlalchemy_utils import database_exists, create_database
 from .models.base import Base
 
 
-class Engine:
+class InternalDB:
     def __init__(self, url):
         self.url = url
         self.engine = create_engine(self.url, echo=True)
