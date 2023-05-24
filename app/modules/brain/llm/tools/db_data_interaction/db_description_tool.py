@@ -43,9 +43,9 @@ class ListSQLDatabaseWithCommentsTool(ListSQLDatabaseTool):
 
         table_strings = []
         for table in tables_to_take:
-            db_comment = self.db._inspector.get_table_comment(table, schema=self.db._schema)["text"]
+            # db_comment = self.db._inspector.get_table_comment(table, schema=self.db._schema)["text"] TODO: Временно решили не учитывать комменты из БД
             override_comment = self.__get_override_table_comment(table)
-            comment = override_comment if override_comment else db_comment
+            comment = override_comment # if override_comment else db_comment
             if comment:
                 table_strings.append(f"{table} ({comment})")
             else:
@@ -112,9 +112,9 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
 
                 # add column comments
                 for column in table.columns:
-                    db_comment = column.comment
+                    # db_comment = column.comment TODO: Временно решили не учитывать комменты из БД
                     override_comment = self.__get_override_column_comment(table.name, column.name)
-                    comment = override_comment if override_comment else db_comment
+                    comment = override_comment # if override_comment else db_comment
                     if comment:
                         f_pattern = r"(\s" + column.name + r"\s[^,\n]*)(,?\n?)"
                         s_pattern = r"\1 COMMENT '" + comment + r"'\2"
