@@ -11,7 +11,7 @@ from modules.tg.utils.decorators import a_only_allowed_users
 from modules.tg.utils.time_watching import ExecInfoStorage
 
 from modules.brain.main import Brain
-from modules.data_access.main import Engine
+from modules.data_access.main import InternalDB
 from modules.data_access.models.brain_response_data import BrainResponseData
 from ..web_app.main import WebApp, WebAppTypes
 from ..utils.button_id import ButtonId
@@ -20,12 +20,12 @@ from ..utils.button_id import ButtonId
 logger = logging.getLogger(__name__)
 
 
-def add_handlers(application: Application, brain: Brain, engine: Engine, web_app_base_url: str):
+def add_handlers(application: Application, brain: Brain, internal_db: InternalDB, web_app_base_url: str):
     application.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND, __get__ask_brain_handler__(brain, web_app_base_url)))
 
     application.add_handler(CallbackQueryHandler(
-        lambda update, context: show_sql_callback(update, context, engine)))
+        lambda update, context: show_sql_callback(update, context, internal_db)))
 
 
 def __get__ask_brain_handler__(brain: Brain, web_app_base_url: str) -> None:
@@ -101,14 +101,14 @@ def __get__ask_brain_handler__(brain: Brain, web_app_base_url: str) -> None:
     return __ask_brain_handler__
 
 
-async def show_sql_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, engine: Engine):
+async def show_sql_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, internal_db: InternalDB):
     query = update.callback_query
     await query.answer()
     answer_without_sql = query.message.text
     callback_data = json.loads(query.data)
     ray_id = callback_data['ray_id']
 
-    with engine.Session() as session:
+    with internal_db.Session() as session:
         brain_response_data = session.query(
             BrainResponseData).filter_by(ray_id=ray_id).first()
         reply_markup = query.message.reply_markup

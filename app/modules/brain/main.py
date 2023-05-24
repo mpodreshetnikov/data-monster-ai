@@ -23,7 +23,7 @@ from modules.brain.llm.parsers.custom_output_parser import CustomAgentOutputPars
 from modules.brain.llm.parsers.custom_output_parser import LastPromptSaverCallbackHandler
 from modules.common.errors import add_info_to_exception
 
-from modules.data_access.main import Engine
+from modules.data_access.main import InternalDB
 
 from modules.data_access.models.brain_response_data import BrainResponseData
 
@@ -62,14 +62,14 @@ class Brain:
         sql_agent_max_iterations: int = 5,
         verbose: bool = False,
         prompt_log_path: str = None,
-        engine: Engine = None
+        internal_db: InternalDB = None
     ) -> None:
         self.db = db
         self._verbose = verbose
         self._sql_query_hints_limit = sql_query_hints_limit
         self._sql_agent_max_iterations = sql_agent_max_iterations
         self._prompt_log_path = prompt_log_path
-        self.engine = engine
+        self.internal_db = internal_db
         if not embeddings:
             logger.warning(
                 "No embeddings provided, using default OpenAIEmbeddings")
@@ -89,17 +89,17 @@ class Brain:
         if self.__is_chart_needed__(question):
             answer.chart_code = self.__provide_chart_code__()
 
-        self.__save_brain_response__(answer.ray_id, answer.sql_script)
+        self.__save_brain_response__(answer)
         return answer
 
     def __provide_chart_code__(self) -> str:
         return "TODO"
 
-    def __save_brain_response__(self, ray_id, sql_script) -> None:
+    def __save_brain_response__(self, answer: Answer) -> None:
         try:
-            with self.engine.Session() as session:
+            with self.internal_db .Session() as session:
                 brain_response_data = BrainResponseData(
-                    ray_id=ray_id, sql_script=sql_script)
+                    ray_id=answer.ray_id, sql_script=answer.sql_script)
                 session.add(brain_response_data)
                 session.commit()
         except Exception as e:
