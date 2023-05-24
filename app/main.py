@@ -51,10 +51,10 @@ def __run_bot_and_block_thread__(config: ConfigParser, brain: Brain, internal_db
 
 def __configure_brain__(config: ConfigParser) -> Brain:
     verbose = config.getboolean("debug", "verbose", fallback=False)
-    db = __configure_db__(config)
+    client_db = __configure_client_db__(config)
     llm = __configure_llm__(config)
     brain = Brain(
-        db=db,
+        db=client_db,
         llm=llm,
         db_hints_doc_path=config.get("hints", "db_hints_doc_path"),
         db_comments_override_path=config.get(
@@ -77,20 +77,20 @@ def __configure_llm__(config: ConfigParser) -> BaseLanguageModel:
     return llm
 
 
-def __configure_db__(config: ConfigParser) -> SQLDatabase:
+def __configure_client_db__(config: ConfigParser) -> SQLDatabase:
     url = URL.create(
-        drivername=config.get("db", "drivername", fallback="postgresql"),
-        username=config.get("db", "username"),
-        password=config.get("db", "password"),
-        host=config.get("db", "host"),
-        port=config.get("db", "port"),
-        database=config.get("db", "database"),
+        drivername=config.get("client_db", "drivername", fallback="postgresql"),
+        username=config.get("client_db", "username"),
+        password=config.get("client_db", "password"),
+        host=config.get("client_db", "host"),
+        port=config.get("client_db", "port"),
+        database=config.get("client_db", "database"),
     )
-    schema = config.get("db", "schema")
-    include_tables = config.get("db", "tables_to_use").split(",")
-    db = SQLDatabase.from_uri(
+    schema = config.get("client_db", "schema")
+    include_tables = config.get("client_db", "tables_to_use").split(",")
+    client_db = SQLDatabase.from_uri(
         url, schema=schema, include_tables=include_tables)
-    return db
+    return client_db
 
 
 def __configure_logger__(config: ConfigParser, log_filename: str = 'log.txt'):

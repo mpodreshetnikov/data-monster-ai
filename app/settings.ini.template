@@ -15,7 +15,7 @@ web_app_storage_base_link = https://mpodreshetnikov.ru/gpt_bi_bot/tg_web_app_pag
 drivername = sqlite
 database = name.sqlite
 
-[db]
+[client_db]
 drivername = postgresql
 username = db_user
 password = qwerty12345
