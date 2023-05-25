@@ -73,9 +73,7 @@ def __get__ask_brain_handler__(brain: Brain, web_app_base_url: str) -> None:
                 question=answer.question, js_code_insertion=answer.chart_code)
             chart_button = InlineKeyboardButton(
                 text=message_text_for("answer_open_chart_button"),
-                callback_data=json.dumps(
-                    {"id": ButtonId.ID_CHART_BUTTON.value}),
-                web_app=WebAppInfo(url=page_url)
+                web_app=WebAppInfo(url=page_url),
             )
 
         keyboard = []
@@ -115,7 +113,9 @@ async def show_sql_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         keyboard_without_sql = []
         for button_row in reply_markup.inline_keyboard:
             for button in button_row:
-                if json.loads(button.callback_data)["id"] != ButtonId.ID_SQL_BUTTON.value:
+                if not button.callback_data:
+                    keyboard_without_sql.append(button)
+                elif json.loads(button.callback_data)["id"] != ButtonId.ID_SQL_BUTTON.value:
                     keyboard_without_sql.append(button)
         if brain_response_data and brain_response_data.sql_script:
             answer_with_sql = message_text_for(
@@ -123,4 +123,4 @@ async def show_sql_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             await query.edit_message_text(text=answer_with_sql)
         else:
             await query.edit_message_text(text=message_text_for("not_found_script_error"))
-        await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard_without_sql))
+        await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup([keyboard_without_sql]))
