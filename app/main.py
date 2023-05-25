@@ -9,7 +9,7 @@ from sqlalchemy import URL
 
 import modules.tg.main as tg
 from modules.brain.main import Brain
-from modules.data_access.main import Engine
+from modules.data_access.main import InternalDB
 
 
 __location__ = os.path.realpath(
@@ -21,17 +21,17 @@ def main():
     config.read(os.path.join(__location__, "settings.ini"))
 
     __configure_logger__(config)
-    engine = __configure_engine__(config)
+    internal_db = __configure_engine__(config)
 
     brain = __configure_brain__(config)
-    brain.engine = engine
+    brain.internal_db = internal_db
 
     run_in_console = config.getboolean(
         "debug", "run_in_console", fallback=False)
     if run_in_console:
         __run_bot_in_console_and_block_thread__(brain)
 
-    __run_bot_and_block_thread__(config, brain, engine)
+    __run_bot_and_block_thread__(config, brain, internal_db)
 
 
 def __run_bot_in_console_and_block_thread__(brain: Brain):
@@ -39,21 +39,26 @@ def __run_bot_in_console_and_block_thread__(brain: Brain):
         question = str(input("Задай вопрос: "))
         brain.answer(question)
 
-def __run_bot_and_block_thread__(config: ConfigParser, brain: Brain, engine:Engine):
+
+def __run_bot_and_block_thread__(config: ConfigParser, brain: Brain, internal_db: InternalDB):
     tg_bot_token = config.get("tg", "bot_token")
     tg_users_whitelist = config.get("tg", "whitelist").split(",")
-    tg_web_app_storage_base_link = config.get("tg", "web_app_storage_base_link")
-    tg.run_bot_and_block_thread(tg_bot_token, brain, engine, tg_users_whitelist, tg_web_app_storage_base_link)
+    tg_web_app_storage_base_link = config.get(
+        "tg", "web_app_storage_base_link")
+    tg.run_bot_and_block_thread(
+        tg_bot_token, brain, internal_db, tg_users_whitelist, tg_web_app_storage_base_link)
+
 
 def __configure_brain__(config: ConfigParser) -> Brain:
     verbose = config.getboolean("debug", "verbose", fallback=False)
-    db = __configure_db__(config)
+    client_db = __configure_client_db__(config)
     llm = __configure_llm__(config)
     brain = Brain(
-        db=db,
+        db=client_db,
         llm=llm,
         db_hints_doc_path=config.get("hints", "db_hints_doc_path"),
-        db_comments_override_path=config.get("hints", "db_comments_override_path"),
+        db_comments_override_path=config.get(
+            "hints", "db_comments_override_path"),
         prompt_log_path=config.get("debug", "prompt_log_path"),
         sql_query_examples_path=config.get("hints", "sql_query_examples_path"),
         sql_query_hints_limit=config.getint(
@@ -72,20 +77,20 @@ def __configure_llm__(config: ConfigParser) -> BaseLanguageModel:
     return llm
 
 
-def __configure_db__(config: ConfigParser) -> SQLDatabase:
+def __configure_client_db__(config: ConfigParser) -> SQLDatabase:
     url = URL.create(
-        drivername=config.get("db", "drivername", fallback="postgresql"),
-        username=config.get("db", "username"),
-        password=config.get("db", "password"),
-        host=config.get("db", "host"),
-        port=config.get("db", "port"),
-        database=config.get("db", "database"),
+        drivername=config.get("client_db", "drivername", fallback="postgresql"),
+        username=config.get("client_db", "username"),
+        password=config.get("client_db", "password"),
+        host=config.get("client_db", "host"),
+        port=config.get("client_db", "port"),
+        database=config.get("client_db", "database"),
     )
-    schema = config.get("db", "schema")
-    include_tables = config.get("db", "tables_to_use").split(",")
-    db = SQLDatabase.from_uri(
+    schema = config.get("client_db", "schema")
+    include_tables = config.get("client_db", "tables_to_use").split(",")
+    client_db = SQLDatabase.from_uri(
         url, schema=schema, include_tables=include_tables)
-    return db
+    return client_db
 
 
 def __configure_logger__(config: ConfigParser, log_filename: str = 'log.txt'):
@@ -107,14 +112,12 @@ def __configure_logger__(config: ConfigParser, log_filename: str = 'log.txt'):
         root_logger.addHandler(console_handler)
 
 
-def __configure_engine__(config: ConfigParser) -> Engine:
+def __configure_engine__(config: ConfigParser) -> InternalDB:
     url = URL.create(
-        drivername=config.get("engine", "drivername", fallback="sqlite"),
-        username=config.get("engine", "username"),
-        password=config.get("engine", "password"),
-        database=config.get("engine", "database"),
+        drivername=config.get("internal_db", "drivername", fallback="sqlite"),
+        database=config.get("internal_db", "database"),
     )
-    return Engine(url)
+    return InternalDB(url)
 
 
 if __name__ == "__main__":

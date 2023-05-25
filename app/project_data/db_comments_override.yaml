@@ -95,7 +95,7 @@ tables:
         comment: Ключ аптеки, которой принадлежит данная сессия
   - name: uas_data_cnt_company
     comment: аптеки
-  - name: uas_data_med_nomenclature
+  - name: uas_data_med_nomenclature_todel
     comment: Таблица содержит информацию о медицинских продуктах, таких как лекарства и медицинские изделия. Каждая строка в таблице представляет собой отдельный элемент номенклатуры.
     columns:
       - name: kind_id

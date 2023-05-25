@@ -5,7 +5,7 @@ import modules.tg.handlers.error_handlers as error_handlers
 from modules.tg.utils.texts import set_config_file_path as set_texts_config_file_path
 from modules.common.security import set_users_white_list
 from modules.brain.main import Brain
-from modules.data_access.main import Engine
+from modules.data_access.main import InternalDB
 from telegram.ext import ApplicationBuilder, Application
 
 import logging
@@ -15,8 +15,9 @@ import os
 logger = logging.getLogger(__name__)
 
 
-def run_bot_and_block_thread(token: str, brain: Brain, engine: Engine, users_whitelist: list[str] = None, web_app_base_url: str = None, ):
-    application = __setup_application__(token, brain, engine, users_whitelist, web_app_base_url)
+def run_bot_and_block_thread(token: str, brain: Brain, internal_db: InternalDB, users_whitelist: list[str] = None, web_app_base_url: str = None, ):
+    application = __setup_application__(
+        token, brain, internal_db, users_whitelist, web_app_base_url)
     logger.info("Running telegram bot...")
     application.run_polling()
 
@@ -40,7 +41,7 @@ async def stop_bot(application: Application):
     logger.info("Telegram bot stopped")
 
 
-def __setup_application__(token: str, brain: Brain, engine: Engine, users_whitelist: list[str] = None, web_app_base_url: str = None,) -> Application:
+def __setup_application__(token: str, brain: Brain, internal_db: InternalDB, users_whitelist: list[str] = None, web_app_base_url: str = None,) -> Application:
     __location__ = os.path.realpath(
         os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
@@ -54,7 +55,8 @@ def __setup_application__(token: str, brain: Brain, engine: Engine, users_whitel
 
     # Handlers, required order
     init_chat_handler.add_handlers(application)
-    brain_handlers.add_handlers(application, brain, engine, web_app_base_url)
+    brain_handlers.add_handlers(
+        application, brain, internal_db, web_app_base_url)
     error_handlers.add_handlers(application)
 
     return application
