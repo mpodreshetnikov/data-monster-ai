@@ -11,6 +11,8 @@ import modules.tg.main as tg
 from modules.brain.main import Brain
 from modules.data_access.main import InternalDB
 
+from utils.custom_SQL_database import CustomSQLDatabase
+
 
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -86,10 +88,10 @@ def __configure_client_db__(config: ConfigParser) -> SQLDatabase:
         port=config.get("client_db", "port"),
         database=config.get("client_db", "database"),
     )
-    schema = config.get("client_db", "schema")
+    #schema = config.get("client_db", "schema")
     include_tables = config.get("client_db", "tables_to_use").split(",")
-    client_db = SQLDatabase.from_uri(
-        url, schema=schema, include_tables=include_tables)
+    client_db = CustomSQLDatabase.from_uri(
+        url, include_tables = include_tables)
     return client_db
 
 
