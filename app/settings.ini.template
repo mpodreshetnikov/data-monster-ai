@@ -23,7 +23,7 @@ host = 1.1.1.1
 port = 1111
 database = dwh_uas
 schema = dwh_uas
-tables_to_use = table1,table2,table3,table4,table5
+tables_to_use = shema1.table1,shema1.table2,shema2.table3,shema2.table4,shema3.table5
 
 [openai]
 api_key = sk-qwerty12345

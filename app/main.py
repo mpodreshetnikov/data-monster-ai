@@ -11,7 +11,7 @@ import modules.tg.main as tg
 from modules.brain.main import Brain
 from modules.data_access.main import InternalDB
 
-from utils.custom_SQL_database import CustomSQLDatabase
+from utils.multischema_sql_database import MultischemaSQLDatabase
 
 
 __location__ = os.path.realpath(
@@ -90,7 +90,7 @@ def __configure_client_db__(config: ConfigParser) -> SQLDatabase:
     )
     #schema = config.get("client_db", "schema")
     include_tables = config.get("client_db", "tables_to_use").split(",")
-    client_db = CustomSQLDatabase.from_uri(
+    client_db = MultischemaSQLDatabase.from_uri(
         url, include_tables = include_tables)
     return client_db
 

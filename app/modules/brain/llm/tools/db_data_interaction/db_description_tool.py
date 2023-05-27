@@ -17,7 +17,7 @@ from langchain.tools.sql_database.tool import (
     # QueryCheckerTool,
     QuerySQLDataBaseTool,
 )
-
+import difflib
 
 class ListSQLDatabaseWithCommentsTool(ListSQLDatabaseTool):
     cache_key: str = ""
@@ -83,14 +83,8 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
         tool_input: str = "",
         run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> str:
-
-        try:
-            schema, table_name_without_schema = table_name.split('.')
-        except ValueError:
-            schema = None
-            table_name_without_schema = table_name
-
-        table_names = [table_name_without_schema]
+        
+        table_names = difflib.get_close_matches(table_name, self.db._include_tables, n=1)
 
         ### Method was taken from InfoSQLDatabaseTool and modified to include column comments ###
         try:
