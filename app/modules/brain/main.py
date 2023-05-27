@@ -14,18 +14,22 @@ from langchain.callbacks.manager import Callbacks
 from langchain.agents import create_sql_agent
 from langchain.callbacks import get_openai_callback
 from openai import InvalidRequestError
+from sqlalchemy import text
 
 from modules.brain.llm.tools.db_data_interaction.toolkit import DbDataInteractionToolkit
 from modules.brain.llm.prompts.sql_agent_prompts import SQL_PREFIX, get_formatted_hints, get_sql_suffix_with_hints
 from modules.brain.llm.prompts.translator_prompts import TRANSLATOR_PROMPT
+from modules.brain.llm.prompts.chart_prompts import GET_CHART_PARAMS_PROMPT, ChartParams, build_data_example_for_prompt
 from modules.brain.llm.monitoring.callback import LogLLMRayCallbackHandler
 from modules.brain.llm.parsers.custom_output_parser import CustomAgentOutputParser
 from modules.brain.llm.parsers.custom_output_parser import LastPromptSaverCallbackHandler
 from modules.common.errors import add_info_to_exception
+from modules.common.sql_helpers import update_limit
 
 from modules.data_access.main import InternalDB
 
 from modules.data_access.models.brain_response_data import BrainResponseData
+
 
 logger = logging.getLogger(__name__)
 
@@ -83,19 +87,21 @@ class Brain:
     def answer(self, question: str) -> Answer:
         ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path)
         answer = self.Answer(question, ray_logger.get_ray_str())
-        answer.answer_text = self.__provide_text_answer__(question, ray_logger)
+        answer.answer_text = self.__provide_text_answer(question, ray_logger)
         answer.sql_script = ray_logger.get_sql_script()
 
-        if self.__is_chart_needed__(question):
-            answer.chart_code = self.__provide_chart_code__()
+        chart_params = self.__provide_chart_params(answer)
 
-        self.__save_brain_response__(answer)
+        if self.__is_chart_needed(question):
+            answer.chart_code = self.__provide_chart_code()
+
+        self.__save_brain_response(answer)
         return answer
 
-    def __provide_chart_code__(self) -> str:
+    def __provide_chart_code(self) -> str:
         return "TODO"
 
-    def __save_brain_response__(self, answer: Answer) -> None:
+    def __save_brain_response(self, answer: Answer) -> None:
         try:
             with self.internal_db .Session() as session:
                 brain_response_data = BrainResponseData(
@@ -105,16 +111,16 @@ class Brain:
         except Exception as e:
             logger.error("failed to write to database", exc_info=True)
 
-    def __is_chart_needed__(self, question: str) -> bool:
+    def __is_chart_needed(self, question: str) -> bool:
         keywords = ["chart", "plot", "graph", "график",
                     "диаграмма", "построить"]
         return any([keyword in question.lower() for keyword in keywords])
 
-    def __provide_text_answer__(self, question: str, ray_logger: LogLLMRayCallbackHandler) -> str:
+    def __provide_text_answer(self, question: str, ray_logger: LogLLMRayCallbackHandler) -> str:
         last_prompt_saver = LastPromptSaverCallbackHandler()
-        sql_agent_chain = self.__build_sql_agent_chain__(
+        sql_agent_chain = self.__build_sql_agent_chain(
             question, last_prompt_saver)
-        lang_translator_chain = self.__build_lang_translator_chain__()
+        lang_translator_chain = self.__build_lang_translator_chain()
 
         overall_chain = SimpleSequentialChain(
             chains=[sql_agent_chain, lang_translator_chain],
@@ -164,7 +170,7 @@ class Brain:
                 logger.info(f"Toolkit builded successfully\n{openai_cb}")
         return toolkit
 
-    def __build_sql_agent_chain__(
+    def __build_sql_agent_chain(
         self,
         question: str,
         last_prompt_saver: LastPromptSaverCallbackHandler,
@@ -196,8 +202,32 @@ class Brain:
 
         return agent_executor
 
-    def __build_lang_translator_chain__(self, llm: BaseLanguageModel = None) -> Chain:
+    def __build_lang_translator_chain(self, llm: BaseLanguageModel = None) -> Chain:
         translator_chain = LLMChain(
             llm=llm or self.default_llm,
             prompt=TRANSLATOR_PROMPT)
         return translator_chain
+    
+    def __provide_chart_params(self, answer: Answer, llm: BaseLanguageModel = None) -> ChartParams | None:
+        _EXAMPLES_LIMIT = 3
+
+        if answer.sql_script is None:
+            return None
+        
+        sql = update_limit(answer.sql_script, _EXAMPLES_LIMIT)
+        try:
+            with self.db._engine.connect() as connection:
+                data = connection.execute(text(sql)).mappings().all()
+        except Exception:
+            logger.warning("Failed to execute sql for chart example data", exc_info=True)
+            return None
+        if not data or len(data) == 0:
+            return None
+        
+        data_example = build_data_example_for_prompt(data, _EXAMPLES_LIMIT)
+
+        chain = LLMChain(llm=llm or self.default_llm, prompt=GET_CHART_PARAMS_PROMPT)
+        result = chain.predict_and_parse(question=answer.question, data_example=data_example)
+        # TODO add prompt logger
+        return result
+
