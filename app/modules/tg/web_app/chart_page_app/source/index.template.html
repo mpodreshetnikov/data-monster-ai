@@ -12,16 +12,11 @@
 <script type="text/javascript">
     <!-- Chart generating code here -->
     const data = {
-        labels: ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июль', 'Август'],
-        datasets: [
-            {
-                label: 'Количество продаж',
-                data: [10000, 8800, 7300, 12200, 8900, 9300, 8200],
-            },
-        ]
+        labels: [/*[LABELS_INSERTION]*/],
+        datasets: [/*[DATASETS_INSERTION]*/],
     };
     const config = {
-        type: 'line',
+        type: 'CHART_TYPE_INSERTION',
         data: data,
     };
 </script>
@@ -67,7 +62,7 @@
             plugins: {
                 title: {
                     display: true,
-                    text: 'График количества продаж по месяцам за 2023 год'
+                    text: 'CHART_TITLE_INSERTION',
                 },
                 legend: {
                     labels: {

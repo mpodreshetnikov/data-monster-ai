@@ -34,15 +34,16 @@ from modules.data_access.models.brain_response_data import BrainResponseData
 logger = logging.getLogger(__name__)
 
 
-class Brain:
-    @dataclass
-    class Answer:
-        question: str
-        ray_id: str
-        answer_text: str = None
-        chart_code: str = None
-        sql_script: str = None
+@dataclass
+class Answer:
+    question: str
+    ray_id: str
+    answer_text: str = None
+    sql_script: str = None
+    chart_params: ChartParams = None
+    chart_data: list[dict] = None
 
+class Brain:
     db: SQLDatabase
     default_llm: BaseLanguageModel
     default_embeddings: Embeddings
@@ -86,20 +87,16 @@ class Brain:
 
     def answer(self, question: str) -> Answer:
         ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path)
-        answer = self.Answer(question, ray_logger.get_ray_str())
+        answer = Answer(question, ray_logger.get_ray_str())
         answer.answer_text = self.__provide_text_answer(question, ray_logger)
         answer.sql_script = ray_logger.get_sql_script()
 
-        chart_params = self.__provide_chart_params(answer)
-
-        if self.__is_chart_needed(question):
-            answer.chart_code = self.__provide_chart_code()
+        answer.chart_params = self.__provide_chart_params(answer, ray_logger=ray_logger)
+        if answer.chart_params:
+            answer.chart_data = self.__get_chart_data(answer)
 
         self.__save_brain_response(answer)
         return answer
-
-    def __provide_chart_code(self) -> str:
-        return "TODO"
 
     def __save_brain_response(self, answer: Answer) -> None:
         try:
@@ -108,13 +105,8 @@ class Brain:
                     ray_id=answer.ray_id, sql_script=answer.sql_script)
                 session.add(brain_response_data)
                 session.commit()
-        except Exception as e:
+        except Exception:
             logger.error("failed to write to database", exc_info=True)
-
-    def __is_chart_needed(self, question: str) -> bool:
-        keywords = ["chart", "plot", "graph", "график",
-                    "диаграмма", "построить"]
-        return any([keyword in question.lower() for keyword in keywords])
 
     def __provide_text_answer(self, question: str, ray_logger: LogLLMRayCallbackHandler) -> str:
         last_prompt_saver = LastPromptSaverCallbackHandler()
@@ -208,26 +200,74 @@ class Brain:
             prompt=TRANSLATOR_PROMPT)
         return translator_chain
     
-    def __provide_chart_params(self, answer: Answer, llm: BaseLanguageModel = None) -> ChartParams | None:
+    def __provide_chart_params(self, answer: Answer, llm: BaseLanguageModel = None, ray_logger: LogLLMRayCallbackHandler = None) -> ChartParams | None:
         _EXAMPLES_LIMIT = 3
+        _DEFAULT = None
 
-        if answer.sql_script is None:
-            return None
+        if not answer or answer.sql_script is None:
+            return _DEFAULT
         
         sql = update_limit(answer.sql_script, _EXAMPLES_LIMIT)
         try:
             with self.db._engine.connect() as connection:
-                data = connection.execute(text(sql)).mappings().all()
+                data: list[dict] = connection.execute(text(sql)).mappings().all()
         except Exception:
             logger.warning("Failed to execute sql for chart example data", exc_info=True)
-            return None
+            return _DEFAULT
         if not data or len(data) == 0:
-            return None
+            return _DEFAULT
         
         data_example = build_data_example_for_prompt(data, _EXAMPLES_LIMIT)
 
-        chain = LLMChain(llm=llm or self.default_llm, prompt=GET_CHART_PARAMS_PROMPT)
-        result = chain.predict_and_parse(question=answer.question, data_example=data_example)
-        # TODO add prompt logger
+        chain = LLMChain(llm=llm or self.default_llm, prompt=GET_CHART_PARAMS_PROMPT, verbose=self._verbose)
+        try:
+            result = chain.predict_and_parse(
+                callbacks=[ray_logger] if ray_logger else [],
+                question=answer.question,
+                data_example=data_example)
+        except Exception:
+            logger.warning("Failed to get chart params", exc_info=True)
+            return _DEFAULT
+
         return result
+    
+    def __get_chart_data(self, answer: Answer) -> dict[str, list]:
+        _DEFAULT: dict[str, list] = None
+
+        if not answer.chart_params:
+            return _DEFAULT
+        sql = update_limit(answer.sql_script, answer.chart_params.limit)
+        if not sql:
+            logger.warning("Failed to update sql with limit")
+            return _DEFAULT
+        try:
+            with self.db._engine.connect() as connection:
+                data: list[dict] = connection.execute(text(sql)).mappings().all()
+        except Exception:
+            logger.warning("Failed to execute sql for chart data", exc_info=True)
+            return _DEFAULT
+        
+        if not data or len(data) == 0:
+            return _DEFAULT
+        
+        if not answer.chart_params.label_column or answer.chart_params.label_column not in data[0].keys():
+            logger.warning("Failed to find label column in data")
+            return _DEFAULT
+        
+        supported_value_columns = list(filter(lambda column: column in data[0].keys(), answer.chart_params.value_columns))
+        if len(supported_value_columns) == 0:
+            logger.warning("Failed to find any of value columns in data")
+            return _DEFAULT
+
+        keys_to_retrieve = [answer.chart_params.label_column, *supported_value_columns]
+        data = list(map(lambda row: {key: row[key] for key in keys_to_retrieve if row[key]}, data))
+        return data
+    
+        keys = list(data[0].keys())
+        formatted_data: dict[str, list] = {}
+        formatted_data.update({key: [] for key in keys})
+        for row in data:
+            for key in keys:
+                formatted_data[key].append(row[key])
+        return formatted_data
 

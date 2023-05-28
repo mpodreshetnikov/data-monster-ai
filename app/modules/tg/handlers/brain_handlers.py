@@ -67,10 +67,9 @@ def __get__ask_brain_handler__(brain: Brain, web_app_base_url: str) -> None:
             sql_button = InlineKeyboardButton(
                 text=message_text_for("answer_show_sql_button"), callback_data=json.dumps({"id": ButtonId.ID_SQL_BUTTON.value, "ray_id": answer.ray_id}))
 
-        if answer.chart_code and web_app_base_url:
+        if answer.chart_params and web_app_base_url:
             web_app = WebApp(WebAppTypes.ChartPage, web_app_base_url)
-            page_url = web_app.create_and_save(
-                question=answer.question, js_code_insertion=answer.chart_code)
+            page_url = web_app.create_and_save(answer)
             chart_button = InlineKeyboardButton(
                 text=message_text_for("answer_open_chart_button"),
                 web_app=WebAppInfo(url=page_url),

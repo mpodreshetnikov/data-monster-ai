@@ -95,7 +95,7 @@ def __configure_client_db__(config: ConfigParser) -> SQLDatabase:
 
 def __configure_logger__(config: ConfigParser, log_filename: str = 'log.txt'):
     log_formatter = logging.Formatter(
-        "%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
+        "%(asctime)s [%(threadName)-12.12s] [%(levelname)-7.7s]  %(message)s")
     root_logger = logging.getLogger()
 
     log_path = config.get("common", "log_path", fallback="logs")

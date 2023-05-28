@@ -1,9 +1,12 @@
+from enum import Enum
 import os
 
 from .chart_page_app.main import build_chart_page
 
+from modules.brain.main import Answer
 
-class WebAppTypes:
+
+class WebAppTypes(Enum):
     ChartPage = 'chart_page'
 
 
@@ -15,14 +18,19 @@ class WebApp:
         self.type = type
         self.base_url = base_url
 
-    def create_and_save(self, **kwargs) -> str:
-        page = self.__build_page__(**kwargs)
+    def create_and_save(self, answer: Answer) -> str:
+        page = self.__build_page__(answer)
         url = self.__save_page__(page)
         return url
 
-    def __build_page__(self, question: str, js_code_insertion: str) -> str:
+    def __build_page__(self, answer: Answer) -> str:
         if self.type == WebAppTypes.ChartPage:
-            return build_chart_page(question, js_code_insertion)
+            return build_chart_page(
+                answer.chart_data,
+                answer.chart_params.label_column,
+                answer.chart_params.chart_type,
+                answer.question
+            )
         raise NotImplementedError(
             f"WebApp type {self.type} is not implemented")
 
