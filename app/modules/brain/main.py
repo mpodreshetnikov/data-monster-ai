@@ -58,16 +58,16 @@ class Brain:
     def __init__(
         self,
         db: SQLDatabase,
-        llm: BaseLanguageModel = None,
-        embeddings: Embeddings = None,
-        db_hints_doc_path: str = None,
-        db_comments_override_path: str = None,
-        sql_query_examples_path: str = None,
+        llm: BaseLanguageModel | None = None,
+        embeddings: Embeddings | None = None,
+        db_hints_doc_path: str | None = None,
+        db_comments_override_path: str | None = None,
+        sql_query_examples_path: str | None = None,
         sql_query_hints_limit: int = 0,
         sql_agent_max_iterations: int = 5,
         verbose: bool = False,
-        prompt_log_path: str = None,
-        internal_db: InternalDB = None
+        prompt_log_path: str | None = None,
+        internal_db: InternalDB | None = None
     ) -> None:
         self.db = db
         self._verbose = verbose

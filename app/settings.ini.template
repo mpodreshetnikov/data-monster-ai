@@ -25,6 +25,11 @@ database = dwh_uas
 schema = dwh_uas
 tables_to_use = table1,table2,table3,table4,table5
 
+[s3]
+endpoint_url = http://localhost:8000
+access_key = AAAAAAAAAAAAAAAAAAA
+secret_key = BBBBBBBBBBBBBBBBBBB
+
 [openai]
 api_key = sk-qwerty12345
 temperature = 0.7
