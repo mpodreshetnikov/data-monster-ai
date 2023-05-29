@@ -87,9 +87,9 @@ def __configure_client_db__(config: ConfigParser) -> SQLDatabase:
         port=config.get("client_db", "port"),
         database=config.get("client_db", "database"),
     )
-    # schema = config.get("client_db", "schema")
+    schema = config.get("client_db", "schema")
     include_tables = config.get("client_db", "tables_to_use").split(",")
-    return MultischemaSQLDatabase.from_uri(url, include_tables=include_tables)
+    return MultischemaSQLDatabase.from_uri(url, schema=schema, include_tables=include_tables)
 
 
 def __configure_logger__(config: ConfigParser, log_filename: str = "log.txt"):
