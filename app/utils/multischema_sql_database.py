@@ -68,38 +68,24 @@ class MultischemaSQLDatabase(SQLDatabase):
             self._all_tables.update(tables + views)
 
         if include_tables:
-            # Split table names into schema and table parts
-            table_parts = (
-                table_name.split(".") if "." in table_name else ("public", table_name)
-                for table_name in include_tables
+            self.included_schemas, self.included_tables = self.parse_table_names(
+                include_tables
             )
-            # Extract unique schemas and tables
-            self.included_schemas, self.included_tables = map(set, zip(*table_parts))
         else:
             self.included_schemas, self.included_tables = set(), set()
 
         self._include_tables = self.included_tables if self.included_tables else set()
-        if self._include_tables:
-            if missing_tables := self._include_tables - self._all_tables:
-                raise ValueError(
-                    f"include_tables {missing_tables} not found in database"
-                )
+        self.validate_tables(self._include_tables, self._all_tables)
 
         if ignore_tables:
-            ignore_table_parts = (
-                table_name.split(".") if "." in table_name else ("public", table_name)
-                for table_name in ignore_tables
+            self.ignore_schemas, self.ignore_tables = self.parse_table_names(
+                ignore_tables
             )
-            self.ignore_schemas, self.ignore_tables = map(set, zip(*ignore_table_parts))
         else:
             self.ignore_schemas, self.ignore_tables = set(), set()
 
         self._ignore_tables = self.ignore_tables if self.ignore_tables else set()
-        if self._ignore_tables:
-            if missing_tables := self._ignore_tables - self._all_tables:
-                raise ValueError(
-                    f"ignore_tables {missing_tables} not found in database"
-                )
+        self.validate_tables(self._ignore_tables, self._all_tables)
 
         usable_tables = self.get_usable_table_names()
         self._usable_tables = set(usable_tables) if usable_tables else self._all_tables
@@ -127,7 +113,20 @@ class MultischemaSQLDatabase(SQLDatabase):
 
         self._metadata = metadata or MetaData()
 
-        with engine.connect() as connection:
+        self.reflect_tables_in_metadata(view_support)
+
+    def reflect_tables_in_metadata(self, view_support: bool):
+        """
+        Функция выполняет отражение таблиц в метаданных на основе списка usable_tables.
+
+        Args:
+            view_support (bool): Флаг, указывающий поддержку представлений.
+
+        Raises:
+            ValueError: Если найдено более одной схемы для таблицы или если схема не найдена.
+
+        """
+        with self._engine.connect() as connection:
             for table_name in self._usable_tables:
                 query = text(
                     "SELECT table_schema FROM information_schema.tables WHERE table_name = :table"
@@ -157,3 +156,16 @@ class MultischemaSQLDatabase(SQLDatabase):
                         f"Schema not found for table {table_name}", exc_info=True
                     )
                     raise ValueError(f"Схема не найдена для таблицы {table_name}")
+
+    def parse_table_names(self, table_names):
+        table_parts = (
+            table_name.split(".") if "." in table_name else ("public", table_name)
+            for table_name in table_names
+        )
+        schemas, tables = map(set, zip(*table_parts))
+        return schemas, tables
+
+    def validate_tables(self, tables, all_tables):
+        if tables:
+            if missing_tables := tables - all_tables:
+                raise ValueError(f"Tables {missing_tables} not found in database")
