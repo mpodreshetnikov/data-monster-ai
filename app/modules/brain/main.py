@@ -204,7 +204,7 @@ class Brain:
         _EXAMPLES_LIMIT = 3
         _DEFAULT = None
 
-        if not answer or answer.sql_script is None:
+        if not answer or not answer.sql_script:
             return _DEFAULT
         
         sql = update_limit(answer.sql_script, _EXAMPLES_LIMIT)
@@ -262,12 +262,4 @@ class Brain:
         keys_to_retrieve = [answer.chart_params.label_column, *supported_value_columns]
         data = list(map(lambda row: {key: row[key] for key in keys_to_retrieve if row[key]}, data))
         return data
-    
-        keys = list(data[0].keys())
-        formatted_data: dict[str, list] = {}
-        formatted_data.update({key: [] for key in keys})
-        for row in data:
-            for key in keys:
-                formatted_data[key].append(row[key])
-        return formatted_data
 

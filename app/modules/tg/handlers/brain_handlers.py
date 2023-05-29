@@ -1,11 +1,11 @@
 import logging
-from mypy_boto3_s3 import S3Client
-
+import json
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import Application, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
-import json
+
+from mypy_boto3_s3 import S3Client
 
 from modules.tg.utils.texts import message_text_for
 from modules.tg.utils.decorators import a_only_allowed_users
@@ -87,8 +87,8 @@ def __get__ask_brain_handler__(
             sql_button = InlineKeyboardButton(
                 text=message_text_for("answer_show_sql_button"), callback_data=json.dumps({"id": ButtonId.ID_SQL_BUTTON.value, "ray_id": answer.ray_id}))
 
-        if answer.chart_params and web_app_base_url:
-            web_app = WebApp(WebAppTypes.ChartPage, web_app_base_url)
+        if answer.chart_params and web_app_base_url and s3client:
+            web_app = WebApp(WebAppTypes.CHART_PAGE, web_app_base_url, s3client)
             page_url = web_app.create_and_save(answer)
             chart_button = InlineKeyboardButton(
                 text=message_text_for("answer_open_chart_button"),

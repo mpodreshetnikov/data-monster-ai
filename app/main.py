@@ -136,7 +136,6 @@ def __configure_s3(config: ConfigParser):
     )
 
     # test connection
-    client.create_bucket(Bucket='healthcheck')
     client.list_buckets()
 
     return client

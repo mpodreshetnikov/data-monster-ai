@@ -29,8 +29,8 @@ class ChartParams:
         Doughnut = "doughnut"
         PolarArea = "polararea"
     chart_type: ChartType = ChartType.Line
-    label_column: str = None
-    value_columns: list[str] = None
+    label_column: str | None = None
+    value_columns: list[str] | None = None
     limit: int = 100
 
 
@@ -38,7 +38,7 @@ class ChartParamsOutputParser(BaseOutputParser):
     def parse(self, text: str) -> ChartParams | None:
         packed_values = text.strip().split("\n")
         # remove numbers and brackets
-        packed_values = list(map(lambda x: re.sub(r"[\d\)]", "", x), packed_values))
+        packed_values = [re.sub(r"[\d\)]", "", x) for x in packed_values]
         if len(packed_values) < 4:
             return None
         chart_needed, label_column, value_columns, chart_type = packed_values
@@ -48,14 +48,15 @@ class ChartParamsOutputParser(BaseOutputParser):
         
         params = ChartParams(
             label_column=label_column.strip().lower() if label_column else None, 
-            value_columns=list(map(lambda x: x.strip().lower(), value_columns.split(",")))) if value_columns else None
-        
+            value_columns=[x.strip().lower() for x in value_columns.split(",")] if value_columns else None)
+
         chart_type = chart_type.split(",")[0].strip() if chart_type else None
+        chart_type_value = None
         try:
             chart_type_value = ChartParams.ChartType(chart_type.lower()) if chart_type else None
-        except:
+        except Exception:
             pass
-        if chart_type_value:
+        if params and chart_type_value:
             params.chart_type = chart_type_value
 
         return params
@@ -64,10 +65,12 @@ class ChartParamsOutputParser(BaseOutputParser):
 GET_CHART_PARAMS_PROMPT = PromptTemplate.from_template(GET_CHART_PARAMS, output_parser=ChartParamsOutputParser())
 
 def build_data_example_for_prompt(data: list[dict], limit: int = 3) -> str:
-    data = data[:limit]
+    if limit <= 0:
+        raise ValueError("Limit must be greater than 0")
+    limited_data = data[:limit]
     columns = list(data[0].keys())
-    data = list(map(lambda x: list(x.values()), data))
-    data.insert(0, columns)
-    data = list(map(lambda x: "\t".join(map(str, x)), data))
-    data = "\n".join(data)
-    return data
+    data_values = [x.values() for x in limited_data]
+    data_with_header = [columns, *data_values]
+    data_strs = ["\t".join(map(str, row)) for row in data_with_header]
+    result = "\n".join(data_strs)
+    return result
