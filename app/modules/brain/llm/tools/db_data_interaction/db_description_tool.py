@@ -124,7 +124,8 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
                 override_comment = self.__get_override_column_comment(
                     table.fullname, column.name
                 )
-                if comment := override_comment:
+                comment = override_comment # if override_comment else db_comment
+                if comment:
                     f_pattern = r"(\s" + column.name + r"\s[^,\n]*)(,?\n?)"
                     s_pattern = r"\1 COMMENT '" + comment + r"'\2"
                     table_info = re.sub(f_pattern, s_pattern, table_info, count=1)
