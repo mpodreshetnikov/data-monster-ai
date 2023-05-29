@@ -17,7 +17,6 @@ from langchain.tools.sql_database.tool import (
     # QueryCheckerTool,
     QuerySQLDataBaseTool,
 )
-import difflib
 
 
 class ListSQLDatabaseWithCommentsTool(ListSQLDatabaseTool):
@@ -99,7 +98,7 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
     def __get_table_info(self, table_names):
         all_table_names = self.db.get_usable_table_names()
         if table_names is not None:
-            if missing_tables := set(table_names).difference(all_table_names):
+            if missing_tables := set(table_names) - set(all_table_names):
                 raise ValueError(f"table_names {missing_tables} not found in database")
             all_table_names = table_names
 
