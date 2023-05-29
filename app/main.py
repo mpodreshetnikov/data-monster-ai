@@ -93,7 +93,7 @@ def __configure_client_db__(config: ConfigParser) -> SQLDatabase:
     schema = config.get("client_db", "schema")
     include_tables = config.get("client_db", "tables_to_use").split(",")
     client_db = SQLDatabase.from_uri(
-        str(url), schema=schema, include_tables=include_tables)
+        url, schema=schema, include_tables=include_tables) # type: ignore
     return client_db
 
 
@@ -136,6 +136,7 @@ def __configure_s3(config: ConfigParser):
     )
 
     # test connection
+    client.create_bucket(Bucket='healthcheck')
     client.list_buckets()
 
     return client
