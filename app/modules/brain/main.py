@@ -103,7 +103,7 @@ class Brain:
 
     def __save_brain_response(self, answer: Answer) -> None:
         try:
-            with self.internal_db .Session() as session:
+            with self.internal_db.Session() as session:
                 brain_response_data = BrainResponseData(
                     ray_id=answer.ray_id, sql_script=answer.sql_script)
                 session.add(brain_response_data)
