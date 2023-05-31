@@ -12,7 +12,8 @@ def build_chart_page(data: list[dict], labels_column: str, chart_type: str, char
     labels = [str(x) for x in __row_for_key(labels_column, data)]
 
     datasets_keys = set(data[0].keys())
-    datasets_keys.remove(labels_column)
+    if labels_column in datasets_keys:
+        datasets_keys.remove(labels_column)
     datasets = [
         { "label": key, "data": __row_for_key(key, data) }
         for key in datasets_keys
@@ -28,4 +29,4 @@ def build_chart_page(data: list[dict], labels_column: str, chart_type: str, char
     return page_str
 
 def __row_for_key(key: str, data: list[dict]) -> list:
-    return list(map(lambda x: x.get(key, None), data))
+    return [x.get(key, None) for x in data]

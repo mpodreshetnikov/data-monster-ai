@@ -38,10 +38,10 @@ logger = logging.getLogger(__name__)
 class Answer:
     question: str
     ray_id: str
-    answer_text: str = None
-    sql_script: str = None
-    chart_params: ChartParams = None
-    chart_data: list[dict] = None
+    answer_text: str | None = None
+    sql_script: str | None = None
+    chart_params: ChartParams | None = None
+    chart_data: list[dict] | None = None
 
 class Brain:
     db: SQLDatabase
@@ -91,9 +91,12 @@ class Brain:
         answer.answer_text = self.__provide_text_answer(question, ray_logger)
         answer.sql_script = ray_logger.get_sql_script()
 
-        answer.chart_params = self.__provide_chart_params(answer, ray_logger=ray_logger)
-        if answer.chart_params:
-            answer.chart_data = self.__get_chart_data(answer)
+        try:
+            answer.chart_params = self.__provide_chart_params(answer, ray_logger=ray_logger)
+            if answer.chart_params:
+                answer.chart_data = self.__get_chart_data(answer)
+        except Exception:
+            answer.chart_params = None
 
         self.__save_brain_response(answer)
         return answer
@@ -231,8 +234,8 @@ class Brain:
 
         return result
     
-    def __get_chart_data(self, answer: Answer) -> dict[str, list]:
-        _DEFAULT: dict[str, list] = None
+    def __get_chart_data(self, answer: Answer) -> list[dict] | None:
+        _DEFAULT: list[dict] | None = None
 
         if not answer.chart_params:
             return _DEFAULT
@@ -247,11 +250,15 @@ class Brain:
             logger.warning("Failed to execute sql for chart data", exc_info=True)
             return _DEFAULT
         
-        if not data or len(data) == 0:
+        if not data:
             return _DEFAULT
         
         if not answer.chart_params.label_column or answer.chart_params.label_column not in data[0].keys():
             logger.warning("Failed to find label column in data")
+            return _DEFAULT
+
+        if not answer.chart_params.value_columns:
+            logger.warning("Failed to find value columns")
             return _DEFAULT
         
         supported_value_columns = list(filter(lambda column: column in data[0].keys(), answer.chart_params.value_columns))
@@ -260,6 +267,6 @@ class Brain:
             return _DEFAULT
 
         keys_to_retrieve = [answer.chart_params.label_column, *supported_value_columns]
-        data = list(map(lambda row: {key: row[key] for key in keys_to_retrieve if row[key]}, data))
+        data = [{key: row[key] for key in keys_to_retrieve if key in row.keys()} for row in data]
         return data
 
