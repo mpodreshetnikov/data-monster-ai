@@ -28,4 +28,4 @@ def build_chart_page(data: list[dict], labels_column: str, chart_type: str, char
     return page_str
 
 def __row_for_key(key: str, data: list[dict]) -> list:
-    return list(map(lambda x: x[key], data))
+    return list(map(lambda x: x.get(key, None), data))
