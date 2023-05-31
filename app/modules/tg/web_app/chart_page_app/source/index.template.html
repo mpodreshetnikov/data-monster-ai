@@ -7,21 +7,15 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.3.0/chart.umd.min.js" integrity="sha512-TJ7U6JRJx5IpyvvO9atNnBzwJIoZDaQnQhb0Wmw32Rj5BQHAmJG16WzaJbDns2Wk5VG6gMt4MytZApZG47rCdg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js" integrity="sha512-UXumZrZNiOwnTcZSHLOfcTs0aos2MzBWHXOHOuB0J/R44QB0dwY5JgfbvljXcklVf65Gc4El6RjZ+lnwd2az2g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js" integrity="sha512-wUYbRPLV5zs6IqvWd88HIqZU/b8TBx+I8LEioQ/UC0t5EMCLApqhIAnUg7EsAzdbhhdgW07TqYDdH3QEXRcPOQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <script type="text/javascript">
     <!-- Chart generating code here -->
     const data = {
-        labels: ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июль', 'Август'],
-        datasets: [
-            {
-                label: 'Количество продаж',
-                data: [10000, 8800, 7300, 12200, 8900, 9300, 8200],
-            },
-        ]
+        labels: [/*[LABELS_INSERTION]*/],
+        datasets: [/*[DATASETS_INSERTION]*/],
     };
     const config = {
-        type: 'line',
+        type: 'CHART_TYPE_INSERTION',
         data: data,
     };
 </script>
@@ -67,22 +61,11 @@
             plugins: {
                 title: {
                     display: true,
-                    text: 'График количества продаж по месяцам за 2023 год'
+                    text: 'CHART_TITLE_INSERTION',
                 },
                 legend: {
                     labels: {
                         color: telegram.themeParams.text_color || '#fff'
-                    }
-                },
-                zoom: {
-                    zoom: {
-                        wheel: {
-                            enabled: true,
-                        },
-                        pinch: {
-                            enabled: true
-                        },
-                        mode: 'xy',
                     }
                 },
             },

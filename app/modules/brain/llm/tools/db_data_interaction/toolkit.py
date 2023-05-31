@@ -81,4 +81,7 @@ class DbDataInteractionToolkit(SQLDatabaseToolkitModified, BaseToolkit):
         tool: InfoSQLDatabaseWithCommentsTool = next(filter(lambda t: isinstance(t, InfoSQLDatabaseWithCommentsTool), self.all_tools), None)
         if not tool:
             return None
-        return tool.run(table)
+        result: str = tool.run(table)
+        if "error" in result.lower():
+            raise Exception(f"Error while getting table info for {table}: {result}")
+        return result
