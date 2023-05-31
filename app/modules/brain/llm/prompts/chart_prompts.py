@@ -31,7 +31,7 @@ class ChartParams:
     chart_type: ChartType = ChartType.Line
     label_column: str | None = None
     value_columns: list[str] | None = None
-    limit: int = 100
+    limit: int = 30
 
 
 class ChartParamsOutputParser(BaseOutputParser):

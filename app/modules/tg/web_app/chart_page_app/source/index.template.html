@@ -13,7 +13,7 @@
     const data = {
         labels: [/*[LABELS_INSERTION]*/],
         datasets: [/*[DATASETS_INSERTION]*/],
-    };
+};
     const config = {
         type: 'CHART_TYPE_INSERTION',
         data: data,
@@ -49,6 +49,7 @@
             scales: {
                     x: {
                         ticks: {
+                            display: false,
                             color: telegram.themeParams.text_color
                         }
                     },
@@ -64,6 +65,7 @@
                     text: 'CHART_TITLE_INSERTION',
                 },
                 legend: {
+                    display: false,
                     labels: {
                         color: telegram.themeParams.text_color || '#fff'
                     }
