@@ -83,15 +83,18 @@ class __InnerCustomAgentOutputParser__(AgentOutputParser):
 
     def parse(self, text: str) -> Union[AgentAction, AgentFinish]:
         for final_answer_action in __FINAL_ANSWER_ACTIONS__:
-            if final_answer_action in text.lower():
+            regex = f"{final_answer_action}(.*)"
+            res = re.search(regex, text, re.DOTALL | re.IGNORECASE)
+            if res:
+                output = res.group(1).strip()
                 return AgentFinish(
-                    {"output": text.split(final_answer_action)[-1].strip()}, text
+                    {"output": output}, text
                 )
         # \s matches against tab/newline/whitespace
         regex = (
             r"Action\s*\d*\s*:[\s]*(.*?)[\s]*Action\s*\d*\s*Input\s*\d*\s*:[\s]*(.*)"
         )
-        match = re.search(regex, text, re.DOTALL)
+        match = re.search(regex, text, re.DOTALL | re.IGNORECASE)
         if not match:
             if "Action: None" in text or "Action: N/A" in text:
                 error_str = "Action was None, but you must specify an action from the list"
