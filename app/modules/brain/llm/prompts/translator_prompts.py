@@ -10,14 +10,14 @@ examples = [
 ]
 
 example_formatter_template = """Text to be translated: {text}
-Translated text: {tr_text}
+Text in Russian language: {tr_text}
 """
 
-TRANSLATOR_PREFIX = """You are a translator from English into Russian. If the text came in Russian, then you leave it in Russian"""
+TRANSLATOR_PREFIX = """You are a translator only from English into Russian"""
 
 TRANSLATOR_SUFFIX = """
 Text to be translated: {input}
-Translated text:
+Text in Russian language:
 """
 
 example_prompt = PromptTemplate(
