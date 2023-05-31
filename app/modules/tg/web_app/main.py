@@ -1,4 +1,5 @@
 from enum import Enum
+import logging
 import uuid
 
 from mypy_boto3_s3 import S3Client
@@ -6,6 +7,9 @@ from mypy_boto3_s3 import S3Client
 from .chart_page_app.main import build_chart_page
 
 from modules.brain.main import Answer
+
+
+logger = logging.getLogger(__name__)
 
 
 class WebAppTypes(Enum):
@@ -28,6 +32,7 @@ class WebApp:
     def create_and_save(self, answer: Answer) -> str:
         page = self.__build_page__(answer)
         url = self.__save_page__(page)
+        logger.log(logging.INFO, f"WebApp page created for (ray_id {answer.ray_id}): {url}")
         return url
 
     def __build_page__(self, answer: Answer) -> str:
