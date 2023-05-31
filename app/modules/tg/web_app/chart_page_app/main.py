@@ -3,13 +3,13 @@ import os
 DIR_DIR = os.path.realpath(os.path.dirname(__file__))
 
 def build_chart_page(data: list[dict], labels_column: str, chart_type: str, chart_title: str) -> str:
-    if not data or len(data) == 0:
+    if not data:
         raise ValueError('data is empty')
     if not chart_type:
         raise ValueError('chart_type is empty')
     chart_title = chart_title or ""
 
-    labels = list(map(str, __row_for_key(labels_column, data)))
+    labels = [str(x) for x in __row_for_key(labels_column, data)]
 
     datasets_keys = set(data[0].keys())
     datasets_keys.remove(labels_column)
