@@ -11,9 +11,10 @@ import modules.tg.main as tg
 from modules.brain.main import Brain
 from modules.data_access.main import InternalDB
 
+from utils.multischema_sql_database import MultischemaSQLDatabase
 
-__location__ = os.path.realpath(
-    os.path.join(os.getcwd(), os.path.dirname(__file__)))
+
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 
 def main():
@@ -26,9 +27,7 @@ def main():
     brain = __configure_brain__(config)
     brain.internal_db = internal_db
 
-    run_in_console = config.getboolean(
-        "debug", "run_in_console", fallback=False)
-    if run_in_console:
+    if run_in_console := config.getboolean("debug", "run_in_console", fallback=False):
         __run_bot_in_console_and_block_thread__(brain)
 
     __run_bot_and_block_thread__(config, brain, internal_db)
@@ -40,32 +39,35 @@ def __run_bot_in_console_and_block_thread__(brain: Brain):
         brain.answer(question)
 
 
-def __run_bot_and_block_thread__(config: ConfigParser, brain: Brain, internal_db: InternalDB):
+def __run_bot_and_block_thread__(
+    config: ConfigParser, brain: Brain, internal_db: InternalDB
+):
     tg_bot_token = config.get("tg", "bot_token")
     tg_users_whitelist = config.get("tg", "whitelist").split(",")
-    tg_web_app_storage_base_link = config.get(
-        "tg", "web_app_storage_base_link")
+    tg_web_app_storage_base_link = config.get("tg", "web_app_storage_base_link")
     tg.run_bot_and_block_thread(
-        tg_bot_token, brain, internal_db, tg_users_whitelist, tg_web_app_storage_base_link)
+        tg_bot_token,
+        brain,
+        internal_db,
+        tg_users_whitelist,
+        tg_web_app_storage_base_link,
+    )
 
 
 def __configure_brain__(config: ConfigParser) -> Brain:
     verbose = config.getboolean("debug", "verbose", fallback=False)
     client_db = __configure_client_db__(config)
     llm = __configure_llm__(config)
-    brain = Brain(
+    return Brain(
         db=client_db,
         llm=llm,
         db_hints_doc_path=config.get("hints", "db_hints_doc_path"),
-        db_comments_override_path=config.get(
-            "hints", "db_comments_override_path"),
+        db_comments_override_path=config.get("hints", "db_comments_override_path"),
         prompt_log_path=config.get("debug", "prompt_log_path"),
         sql_query_examples_path=config.get("hints", "sql_query_examples_path"),
-        sql_query_hints_limit=config.getint(
-            "hints", "query_hints_limit", fallback=0),
+        sql_query_hints_limit=config.getint("hints", "query_hints_limit", fallback=0),
         verbose=verbose,
     )
-    return brain
 
 
 def __configure_llm__(config: ConfigParser) -> BaseLanguageModel:
@@ -73,8 +75,7 @@ def __configure_llm__(config: ConfigParser) -> BaseLanguageModel:
     openai_api_key = config.get("openai", "api_key")
     temperature = config.getfloat("openai", "temperature", fallback=0.7)
     os.environ["OPENAI_API_KEY"] = openai_api_key
-    llm = ChatOpenAI(verbose=verbose, temperature=temperature)
-    return llm
+    return ChatOpenAI(verbose=verbose, temperature=temperature)
 
 
 def __configure_client_db__(config: ConfigParser) -> SQLDatabase:
@@ -88,24 +89,23 @@ def __configure_client_db__(config: ConfigParser) -> SQLDatabase:
     )
     schema = config.get("client_db", "schema")
     include_tables = config.get("client_db", "tables_to_use").split(",")
-    client_db = SQLDatabase.from_uri(
-        url, schema=schema, include_tables=include_tables)
-    return client_db
+    return MultischemaSQLDatabase.from_uri(url, schema=schema, include_tables=include_tables)
 
 
-def __configure_logger__(config: ConfigParser, log_filename: str = 'log.txt'):
+def __configure_logger__(config: ConfigParser, log_filename: str = "log.txt"):
     log_formatter = logging.Formatter(
-        "%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
+        "%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s"
+    )
     root_logger = logging.getLogger()
 
     log_path = config.get("common", "log_path", fallback="logs")
     file_handler = logging.FileHandler(
-        "{0}/{1}".format(log_path, log_filename), mode='w')
+        "{0}/{1}".format(log_path, log_filename), mode="w"
+    )
     file_handler.setFormatter(log_formatter)
     root_logger.addHandler(file_handler)
 
-    verbose = config.getboolean("debug", "verbose", fallback=False)
-    if verbose:
+    if verbose := config.getboolean("debug", "verbose", fallback=False):
         root_logger.setLevel(logging.INFO)
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(log_formatter)

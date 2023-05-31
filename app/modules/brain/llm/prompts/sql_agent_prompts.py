@@ -13,7 +13,9 @@ DO NOT query non-existent columns. Check table information before querying the d
 DO NOT make any DML statements (INSERT, UPDATE, DELETE, DROP, etc.) on the database.
 DO NOT print any identifiers (*_id) in your final answer, use names instead.
 
-If the result is a list, table or grouping, always return all the elements as enumeration in final answer.
+Never insert bogus, made-up data as a final answer.
+
+If the result is not an empty list, table, or grouping, always return all elements as an enum in the final response.
 
 You have access to tools for interacting with the database.
 Only use the below tools. Only use the information returned by the below tools to construct your final answer.
@@ -37,10 +39,6 @@ Bad Completion
 ---
 Above, the Bad Completion did not satisfy the constraints given in the Prompt.
 Details: {error}
-Please forget the Bad Completion and rewrite the new one, follow the format: Thought, then Action/Action Input or Final answer
----
-New Good Completion
----
 """
 AGENT_RETRY_WITH_ERROR_PROMPT = PromptTemplate.from_template(__AGENT_RETRY_WITH_ERROR__)
 
