@@ -1,10 +1,11 @@
 import logging
-
+import json
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import Application, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
-import json
+
+from mypy_boto3_s3 import S3Client
 
 from modules.tg.utils.texts import message_text_for
 from modules.tg.utils.decorators import a_only_allowed_users
@@ -20,31 +21,50 @@ from ..utils.button_id import ButtonId
 logger = logging.getLogger(__name__)
 
 
-def add_handlers(application: Application, brain: Brain, internal_db: InternalDB, web_app_base_url: str):
+def add_handlers(
+        application: Application,
+        brain: Brain,
+        internal_db: InternalDB,
+        web_app_base_url: str | None = None,
+        s3client: S3Client | None = None
+    ):
     application.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND, __get__ask_brain_handler__(brain, web_app_base_url)))
+        filters.TEXT & ~filters.COMMAND, __get__ask_brain_handler__(brain, web_app_base_url, s3client)))
 
     application.add_handler(CallbackQueryHandler(
         lambda update, context: show_sql_callback(update, context, internal_db)))
 
 
-def __get__ask_brain_handler__(brain: Brain, web_app_base_url: str) -> None:
+def __get__ask_brain_handler__(
+        brain: Brain,
+        web_app_base_url: str | None = None,
+        s3client: S3Client | None = None
+    ):
     if not web_app_base_url:
         logger.warning(
             "No web_app_base_url provided, chart page will not be available")
+    if not s3client:
+        logger.warning(
+            "No s3client provided, chart page will not be available")
 
     exec_info_storage = ExecInfoStorage(count=10)
 
     @a_only_allowed_users
     async def __ask_brain_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        chat_id = update.effective_chat.id
-        user_id = update.effective_user.id
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        user_id = update.effective_user.id if update.effective_user else None
         question = " ".join(
-            context.args) if context.args else update.message.text
+            context.args) if context.args else update.message.text if update.message else None
+
+        if not chat_id or not user_id or not question:
+            raise Exception("Empty chat_id or user_id or question provided")
+        
+        username = update.effective_user.username if update.effective_user else None
 
         logger.info(
-            f"User {update.effective_user.username}:{update.effective_user.id} asked a question {question}")
+            f"User {username}:{user_id} asked a question {question}")
 
+        seconds = None
         if exec_info_storage:
             seconds = exec_info_storage.average()
         if seconds:
@@ -58,7 +78,7 @@ def __get__ask_brain_handler__(brain: Brain, web_app_base_url: str) -> None:
         answer = brain.answer(question)
 
         logger.info(
-            f"User {update.effective_user.username}:{update.effective_user.id} got brain answer: {str(answer.answer_text)}")
+            f"User {username}:{user_id} got brain answer: {str(answer.answer_text)}")
 
         sql_button = None
         chart_button = None
@@ -67,10 +87,9 @@ def __get__ask_brain_handler__(brain: Brain, web_app_base_url: str) -> None:
             sql_button = InlineKeyboardButton(
                 text=message_text_for("answer_show_sql_button"), callback_data=json.dumps({"id": ButtonId.ID_SQL_BUTTON.value, "ray_id": answer.ray_id}))
 
-        if answer.chart_code and web_app_base_url:
-            web_app = WebApp(WebAppTypes.ChartPage, web_app_base_url)
-            page_url = web_app.create_and_save(
-                question=answer.question, js_code_insertion=answer.chart_code)
+        if answer.chart_params and web_app_base_url and s3client:
+            web_app = WebApp(WebAppTypes.CHART_PAGE, web_app_base_url, s3client)
+            page_url = web_app.create_and_save(answer)
             chart_button = InlineKeyboardButton(
                 text=message_text_for("answer_open_chart_button"),
                 web_app=WebAppInfo(url=page_url),
