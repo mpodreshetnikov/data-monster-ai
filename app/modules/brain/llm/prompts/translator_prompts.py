@@ -35,5 +35,3 @@ TRANSLATOR_PROMPT = FewShotPromptTemplate(
     input_variables=["input"],
     example_separator="\n",
 )
-
-print(TRANSLATOR_PROMPT.format(input="The answer seems to be empty"))
