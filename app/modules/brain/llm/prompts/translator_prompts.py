@@ -16,8 +16,7 @@ _EXAMPLE_FORMATTER_TEMPLATE = """
 Text to be translated: {text}
 Text in Russian: {tr_text}"""
 
-_TRANSLATOR_PREFIX = """You are a translator only from English to Russian and from Russian to Russian.
-Below are examples:"""
+_TRANSLATOR_PREFIX = """You are a translator only from English into Russian and from Russian into Russian. If a text comes in English, you translate it into Russian, if a text comes in Russian, you leave it in Russian."""
 
 _TRANSLATOR_SUFFIX = """
 Text to be translated: {input}
