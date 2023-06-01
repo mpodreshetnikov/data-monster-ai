@@ -1,29 +1,14 @@
-from langchain import SQLDatabase
-
-
-import warnings
-from typing import Any, Iterable, List, Optional
-
-import sqlalchemy
-from sqlalchemy import (
-    MetaData,
-    Table,
-    create_engine,
-    inspect,
-    select,
-    text,
-)
-from sqlalchemy.engine import CursorResult, Engine
-from sqlalchemy.exc import ProgrammingError, SQLAlchemyError
-from sqlalchemy.schema import CreateTable
+from typing import List, Optional
 import logging
 
+from langchain import SQLDatabase
 
-def _format_index(index: sqlalchemy.engine.interfaces.ReflectedIndex) -> str:
-    return (
-        f'Name: {index["name"]}, Unique: {index["unique"]},'
-        f' Columns: {str(index["column_names"])}'
-    )
+from sqlalchemy import (
+    MetaData,
+    inspect,
+    text,
+)
+from sqlalchemy.engine import Engine
 
 
 logger = logging.getLogger(__name__)
@@ -45,9 +30,10 @@ class MultischemaSQLDatabase(SQLDatabase):
         view_support: bool = False,
     ):
         if schema:
-            return super().__init__(
+            super().__init__(
                 engine, schema, metadata, ignore_tables, include_tables
             )
+            return
 
         self._schema = None
         self._engine = engine
