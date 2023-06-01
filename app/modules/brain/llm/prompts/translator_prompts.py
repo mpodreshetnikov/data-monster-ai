@@ -3,8 +3,8 @@ from langchain import PromptTemplate, FewShotPromptTemplate
 
 _examples = [
     {
-        "text": "Коровина Наталья Васильевна продала больше всех анальгина - 8 штук",
-        "tr_text": "Коровина Наталья Васильевна продала больше всех анальгина - 8 штук",
+        "text": "Вася Пупкин продал больше всех машин - 8 штук",
+        "tr_text": "Вася Пупкин продал больше всех машин - 8 штук",
     },
     {
         "text": "The answer seems to be empty",
@@ -16,7 +16,8 @@ _EXAMPLE_FORMATTER_TEMPLATE = """
 Text to be translated: {text}
 Text in Russian: {tr_text}"""
 
-_TRANSLATOR_PREFIX = """You are a translator only from English to Russian."""
+_TRANSLATOR_PREFIX = """You are a translator only from English to Russian and from Russian to Russian.
+Below are examples:"""
 
 _TRANSLATOR_SUFFIX = """
 Text to be translated: {input}
