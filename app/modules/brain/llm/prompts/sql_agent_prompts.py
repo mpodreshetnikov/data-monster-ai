@@ -39,6 +39,10 @@ Bad Completion
 ---
 Above, the Bad Completion did not satisfy the constraints given in the Prompt.
 Details: {error}
+Please forget the Bad Completion and rewrite the new one, follow the format: Thought, then Action/Action Input or Final answer
+---
+New Good Completion
+---
 """
 AGENT_RETRY_WITH_ERROR_PROMPT = PromptTemplate.from_template(__AGENT_RETRY_WITH_ERROR__)
 
