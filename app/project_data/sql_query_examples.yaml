@@ -71,3 +71,23 @@ list:
       JOIN uas_cash_cheque_item on uas_cash_cheque_item.cheque_id = uas_cash_cheque.cheque_id
       JOIN uas_cash_cheque_sum on uas_cash_cheque_sum.check_id = uas_cash_cheque.cheque_id
       WHERE sum_type notnull and discont_name notnull
+  - question: Топ 3 товара которые берут вместе с ибупрофеном?
+    tables: [uas_cash_cheque_item, uas_data_med_nomenclature_todel]
+    query: |
+      WITH analgin_cheques AS (
+        SELECT distinct cheque_id
+        FROM uas_cash_cheque_item
+        JOIN uas_data_med_nomenclature_todel ON uas_cash_cheque_item.nomencl_id = uas_data_med_nomenclature_todel.nomenclature_id
+        WHERE uas_data_med_nomenclature_todel.name ILIKE '%ибупрофен%'
+      ), items_with_analgin AS (
+        SELECT uas_data_med_nomenclature_todel.name, COUNT(*) AS frequency
+        FROM uas_cash_cheque_item
+        JOIN analgin_cheques ON uas_cash_cheque_item.cheque_id = analgin_cheques.cheque_id
+        JOIN uas_data_med_nomenclature_todel ON uas_cash_cheque_item.nomencl_id = uas_data_med_nomenclature_todel.nomenclature_id
+        WHERE uas_data_med_nomenclature_todel.name NOT ILIKE '%ибупрофен%' AND uas_data_med_nomenclature_todel.name IS NOT NULL
+        GROUP BY uas_data_med_nomenclature_todel.name
+      )
+      SELECT name, frequency
+      FROM items_with_analgin
+      ORDER BY frequency DESC
+      LIMIT 3;
