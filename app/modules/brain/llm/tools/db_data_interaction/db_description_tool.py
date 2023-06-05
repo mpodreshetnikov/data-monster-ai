@@ -193,17 +193,7 @@ class LightweightQuerySQLDataBaseTool(QuerySQLDataBaseTool):
             simplified_error_text = result.split("[SQL:")[0].rstrip()
             return simplified_error_text
         return result
-    async def _arun(     # TODO change super()._run(query, run_manager) to arun_no_throw when an asyn db connection is created
-        self,
-        query: str,
-        tool_input: str = "",
-        run_manager: Optional[CallbackManagerForToolRun] = None,
-    ) -> str:
-        result: str = super()._run(query, run_manager)
-        if "Error:" in result:
-            simplified_error_text = result.split("[SQL:")[0].rstrip()
-            return simplified_error_text
-        return result
+
 
 class SQLDatabaseToolkitModified(BaseToolkit):
     """Toolkit for interacting with SQL databases."""
