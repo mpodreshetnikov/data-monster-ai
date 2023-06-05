@@ -22,10 +22,11 @@ def run_bot_and_block_thread(
         internal_db: InternalDB,
         users_whitelist: list[str] | None = None,
         web_app_base_url: str | None = None,
-        s3client: S3Client | None = None
+        s3client: S3Client | None = None,
+        statistic:str| None = None,
     ):
     application = __setup_application__(
-        token, brain, internal_db, users_whitelist, web_app_base_url, s3client)
+        token, brain, internal_db, users_whitelist, web_app_base_url, s3client, statistic)
     logger.info("Running telegram bot...")
     application.run_polling()
 
@@ -55,7 +56,8 @@ def __setup_application__(
         internal_db: InternalDB,
         users_whitelist: list[str] | None = None,
         web_app_base_url: str | None = None,
-        s3client: S3Client | None = None
+        s3client: S3Client | None = None,
+        statistic:str| None = None,
     ) -> Application:
     __location__ = os.path.realpath(
         os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -71,7 +73,7 @@ def __setup_application__(
     # Handlers, required order
     init_chat_handler.add_handlers(application)
     brain_handlers.add_handlers(
-        application, brain, internal_db, web_app_base_url, s3client)
-    error_handlers.add_handlers(application)
+        application, brain, internal_db, web_app_base_url, s3client, statistic)
+    error_handlers.add_handlers(application, statistic)
 
     return application

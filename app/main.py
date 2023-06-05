@@ -36,6 +36,7 @@ def main():
     if run_in_console:
         __run_bot_in_console_and_block_thread__(brain)
 
+    
     __run_bot_and_block_thread__(config, brain, internal_db, s3client)
 
 
@@ -48,9 +49,10 @@ def __run_bot_in_console_and_block_thread__(brain: Brain):
 def __run_bot_and_block_thread__(config: ConfigParser, brain: Brain, internal_db: InternalDB, s3client: S3Client):
     tg_bot_token = config.get("tg", "bot_token")
     tg_users_whitelist = config.get("tg", "whitelist").split(",")
+    statistic = config.get("common", "statistic")
     tg_web_app_storage_base_link = config.get("tg", "web_app_storage_base_link")
     tg.run_bot_and_block_thread(
-        tg_bot_token, brain, internal_db, tg_users_whitelist, tg_web_app_storage_base_link, s3client)
+        tg_bot_token, brain, internal_db, tg_users_whitelist, tg_web_app_storage_base_link, s3client, statistic)
 
 
 def __configure_brain__(config: ConfigParser) -> Brain:
