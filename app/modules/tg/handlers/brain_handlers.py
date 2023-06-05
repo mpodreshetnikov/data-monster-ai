@@ -75,7 +75,7 @@ def __get__ask_brain_handler__(
         exec_info_storage_key = f"{chat_id}_{user_id}"
         exec_info_storage.start(exec_info_storage_key)
 
-        answer = brain.answer(question)
+        answer = await brain.answer(question)
 
         logger.info(
             f"User {username}:{user_id} got brain answer: {str(answer.answer_text)}")
