@@ -8,9 +8,9 @@ import uuid
 
 
 class LogLLMRayCallbackHandler(BaseCallbackHandler):
-    log_path: str = Field()
-    ray_id: str = Field()
-    sql_script: str = Field()
+    log_path: str | None = None
+    ray_id: str | None = None
+    sql_script: str | None = None
 
     def __init__(self, log_path: str) -> None:
         self.log_path = log_path

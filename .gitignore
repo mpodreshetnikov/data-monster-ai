@@ -10,3 +10,4 @@ indices
 *log.txt
 logs
 *.sqlite
+*.csv
