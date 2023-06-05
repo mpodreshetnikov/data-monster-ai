@@ -85,14 +85,14 @@ class Brain:
         self._default_sql_llm_toolkit = self.__build_sql_llm_toolkit(
             db_hints_doc_path, db_comments_override_path, sql_query_examples_path)
 
-    def answer(self, question: str) -> Answer:
+    async def answer(self, question: str) -> Answer:
         ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path)
         answer = Answer(question, ray_logger.get_ray_str())
-        answer.answer_text = self.__provide_text_answer(question, ray_logger)
+        answer.answer_text = await self.__provide_text_answer(question, ray_logger)
         answer.sql_script = ray_logger.get_sql_script()
 
         try:
-            answer.chart_params = self.__provide_chart_params(answer, ray_logger=ray_logger)
+            answer.chart_params = await self.__provide_chart_params(answer, ray_logger=ray_logger)
             if answer.chart_params:
                 answer.chart_data = self.__get_chart_data(answer)
         except Exception:
@@ -111,7 +111,7 @@ class Brain:
         except Exception:
             logger.error("failed to write to database", exc_info=True)
 
-    def __provide_text_answer(self, question: str, ray_logger: LogLLMRayCallbackHandler) -> str:
+    async def __provide_text_answer(self, question: str, ray_logger: LogLLMRayCallbackHandler) -> str:
         last_prompt_saver = LastPromptSaverCallbackHandler()
         sql_agent_chain = self.__build_sql_agent_chain(
             question, last_prompt_saver)
@@ -123,7 +123,7 @@ class Brain:
 
         with get_openai_callback() as openai_cb:
             try:
-                response = overall_chain.run(
+                response = await overall_chain.arun(
                     question,
                     callbacks=[last_prompt_saver, ray_logger, *self._inheritable_llm_callbacks],)
             except OutputParserException as e:
@@ -203,7 +203,7 @@ class Brain:
             prompt=TRANSLATOR_PROMPT)
         return translator_chain
     
-    def __provide_chart_params(self, answer: Answer, llm: BaseLanguageModel = None, ray_logger: LogLLMRayCallbackHandler = None) -> ChartParams | None:
+    async def __provide_chart_params(self, answer: Answer, llm: BaseLanguageModel = None, ray_logger: LogLLMRayCallbackHandler = None) -> ChartParams | None:
         _EXAMPLES_LIMIT = 3
         _DEFAULT = None
 
@@ -224,7 +224,7 @@ class Brain:
 
         chain = LLMChain(llm=llm or self.default_llm, prompt=GET_CHART_PARAMS_PROMPT, verbose=self._verbose)
         try:
-            result = chain.predict_and_parse(
+            result = await chain.apredict_and_parse(
                 callbacks=[ray_logger] if ray_logger else [],
                 question=answer.question,
                 data_example=data_example)
