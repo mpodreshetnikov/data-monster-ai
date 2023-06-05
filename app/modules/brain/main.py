@@ -92,7 +92,7 @@ class Brain:
         answer.sql_script = ray_logger.get_sql_script()
 
         try:
-            answer.chart_params = self.__provide_chart_params(answer, ray_logger=ray_logger)
+            answer.chart_params = await self.__provide_chart_params(answer, ray_logger=ray_logger)
             if answer.chart_params:
                 answer.chart_data = self.__get_chart_data(answer)
         except Exception:
@@ -203,7 +203,7 @@ class Brain:
             prompt=TRANSLATOR_PROMPT)
         return translator_chain
     
-    def __provide_chart_params(self, answer: Answer, llm: BaseLanguageModel = None, ray_logger: LogLLMRayCallbackHandler = None) -> ChartParams | None:
+    async def __provide_chart_params(self, answer: Answer, llm: BaseLanguageModel = None, ray_logger: LogLLMRayCallbackHandler = None) -> ChartParams | None:
         _EXAMPLES_LIMIT = 3
         _DEFAULT = None
 
@@ -224,7 +224,7 @@ class Brain:
 
         chain = LLMChain(llm=llm or self.default_llm, prompt=GET_CHART_PARAMS_PROMPT, verbose=self._verbose)
         try:
-            result = chain.predict_and_parse(
+            result = await chain.apredict_and_parse(
                 callbacks=[ray_logger] if ray_logger else [],
                 question=answer.question,
                 data_example=data_example)
