@@ -1,6 +1,5 @@
 from typing import List, Optional
 import logging
-import asyncio
 
 from langchain import SQLDatabase
 
@@ -10,7 +9,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.engine import Engine
-from sqlalchemy.exc import ProgrammingError, SQLAlchemyError
+
 
 logger = logging.getLogger(__name__)
 
@@ -156,44 +155,3 @@ class MultischemaSQLDatabase(SQLDatabase):
         if tables:
             if missing_tables := tables - all_tables:
                 raise ValueError(f"Tables {missing_tables} not found in database")
-
-    async def arun(self, command: str, fetch: str = "all") -> str:
-        """Execute a SQL command and return a string representing the results.
-
-        If the statement returns rows, a string of the results is returned.
-        If the statement returns no rows, an empty string is returned.
-        """
-        async with self._engine.begin() as connection: # TODO Create an asynchronous connection to the database
-            if self._schema is not None:
-                if self.dialect == "snowflake":
-                    await connection.exec_driver_sql(
-                        f"ALTER SESSION SET search_path='{self._schema}'"
-                    )
-                elif self.dialect == "bigquery":
-                    await connection.exec_driver_sql(f"SET @@dataset_id='{self._schema}'")
-                else:
-                    await  connection.exec_driver_sql(f"SET search_path TO {self._schema}")
-            cursor = await  connection.execute(text(command))
-            if cursor.returns_rows:
-                if fetch == "all":
-                    result = await cursor.fetchall()
-                elif fetch == "one":
-                    result = (await cursor.fetchone())[0]  # type: ignore
-                else:
-                    raise ValueError("Fetch parameter must be either 'one' or 'all'")
-                return str(result)
-        return ""
-    
-    async def arun_no_throw(self, command: str, fetch: str = "all") -> str:
-        """Execute a SQL command and return a string representing the results.
-
-        If the statement returns rows, a string of the results is returned.
-        If the statement returns no rows, an empty string is returned.
-
-        If the statement throws an error, the error message is returned.
-        """
-        try:
-            return await self.arun(command, fetch)
-        except SQLAlchemyError as e:
-            """Format the error message"""
-            return f"Error: {e}"

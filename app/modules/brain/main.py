@@ -85,10 +85,10 @@ class Brain:
         self._default_sql_llm_toolkit = self.__build_sql_llm_toolkit(
             db_hints_doc_path, db_comments_override_path, sql_query_examples_path)
 
-    async def answer(self, question: str) -> Answer:
+    def answer(self, question: str) -> Answer:
         ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path)
         answer = Answer(question, ray_logger.get_ray_str())
-        answer.answer_text = await self.__provide_text_answer(question, ray_logger)
+        answer.answer_text = self.__provide_text_answer(question, ray_logger)
         answer.sql_script = ray_logger.get_sql_script()
 
         try:
@@ -111,7 +111,7 @@ class Brain:
         except Exception:
             logger.error("failed to write to database", exc_info=True)
 
-    async def __provide_text_answer(self, question: str, ray_logger: LogLLMRayCallbackHandler) -> str:
+    def __provide_text_answer(self, question: str, ray_logger: LogLLMRayCallbackHandler) -> str:
         last_prompt_saver = LastPromptSaverCallbackHandler()
         sql_agent_chain = self.__build_sql_agent_chain(
             question, last_prompt_saver)
@@ -123,7 +123,7 @@ class Brain:
 
         with get_openai_callback() as openai_cb:
             try:
-                response = await overall_chain.arun(
+                response = overall_chain.run(
                     question,
                     callbacks=[last_prompt_saver, ray_logger, *self._inheritable_llm_callbacks],)
             except OutputParserException as e:
