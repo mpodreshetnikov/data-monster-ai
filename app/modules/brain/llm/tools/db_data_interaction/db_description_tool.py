@@ -17,6 +17,10 @@ from langchain.tools.sql_database.tool import (
     # QueryCheckerTool,
     QuerySQLDataBaseTool,
 )
+from langchain.callbacks.manager import (
+    AsyncCallbackManagerForToolRun,
+    CallbackManagerForToolRun,
+)
 
 
 class ListSQLDatabaseWithCommentsTool(ListSQLDatabaseTool):
@@ -28,6 +32,46 @@ class ListSQLDatabaseWithCommentsTool(ListSQLDatabaseTool):
     )
 
     def _run(
+        self,
+        tool_input: str = "",
+        run_manager: Optional[CallbackManagerForToolRun] = None,
+    ) -> str:
+        """Get the schema for a specific table."""
+        if self.db._include_tables:
+            tables_to_take = self.db._include_tables
+        else:
+            tables_to_take = self.db._all_tables - self.db._ignore_tables
+
+        # return cached data if possible
+        cache_key = str.join(",", tables_to_take)
+        if cache_key == self.cache_key:
+            return self.cache
+
+        table_strings = []
+        for table in tables_to_take:
+            # db_comment = self.db._inspector.get_table_comment(table, schema=self.db._schema)["text"] TODO: Временно решили не учитывать комменты из БД
+            override_comment = self.__get_override_table_comment(table)
+            comment = override_comment  # if override_comment else db_comment
+            if comment:
+                table_strings.append(f"{table} ({comment})")
+            else:
+                table_strings.append(table)
+
+        value = ", ".join(table_strings)
+        self.cache_key = cache_key
+        self.cache = value
+
+        return value
+
+    def __get_override_table_comment(self, table_name):
+        if not self.db_comments_override:
+            return None
+        for table in self.db_comments_override:
+            if table["name"] == table_name:
+                return table["comment"]
+        return None
+
+    async def _arun(  # TODO change async
         self,
         tool_input: str = "",
         run_manager: Optional[CallbackManagerForToolRun] = None,
@@ -94,6 +138,20 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
             """Format the error message"""
             return f"Error: {e}"
 
+    async def _arun(  # TODO change
+        self,
+        table_name: str,
+        run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
+    ) -> str:
+        table_name = self.__get_table_name(table_name)
+        table_names = [table_name]
+
+        try:
+            return self.__get_table_info(table_names)
+        except ValueError as e:
+            """Format the error message"""
+            return f"Error: {e}"
+
     ### Method was taken from InfoSQLDatabaseTool and modified to include column comments ###
     def __get_table_info(self, table_names):
         all_table_names = self.db.get_usable_table_names()
@@ -124,7 +182,7 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
                 override_comment = self.__get_override_column_comment(
                     table.fullname, column.name
                 )
-                comment = override_comment # if override_comment else db_comment
+                comment = override_comment  # if override_comment else db_comment
                 if comment:
                     f_pattern = r"(\s" + column.name + r"\s[^,\n]*)(,?\n?)"
                     s_pattern = r"\1 COMMENT '" + comment + r"'\2"
@@ -193,7 +251,8 @@ class LightweightQuerySQLDataBaseTool(QuerySQLDataBaseTool):
             simplified_error_text = result.split("[SQL:")[0].rstrip()
             return simplified_error_text
         return result
-    async def _arun(     # TODO change super()._run(query, run_manager) to arun_no_throw when an asyn db connection is created
+
+    async def _arun(  # TODO change super()._run(query, run_manager) to arun_no_throw when an asyn db connection is created
         self,
         query: str,
         tool_input: str = "",
@@ -204,6 +263,7 @@ class LightweightQuerySQLDataBaseTool(QuerySQLDataBaseTool):
             simplified_error_text = result.split("[SQL:")[0].rstrip()
             return simplified_error_text
         return result
+
 
 class SQLDatabaseToolkitModified(BaseToolkit):
     """Toolkit for interacting with SQL databases."""
