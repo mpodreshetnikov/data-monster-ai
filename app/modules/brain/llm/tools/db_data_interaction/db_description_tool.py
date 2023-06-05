@@ -103,14 +103,6 @@ class ListSQLDatabaseWithCommentsTool(ListSQLDatabaseTool):
 
         return value
 
-    def __get_override_table_comment(self, table_name):
-        if not self.db_comments_override:
-            return None
-        for table in self.db_comments_override:
-            if table["name"] == table_name:
-                return table["comment"]
-        return None
-
 
 class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
     description = """
