@@ -84,9 +84,9 @@ def __get__ask_brain_handler__(
             raise Exception("Empty chat_id or message_id or user_id or question provided")
 
         username = update.effective_user.username if update.effective_user else None
-        
+
         StatisticWriter.add_statistic(statistic, chat_id, message_id, username, user_id, question)
-        
+
         logger.info(f"User {username}:{user_id} asked a question {question}")
 
         seconds = None
@@ -124,13 +124,17 @@ def __get__ask_brain_handler__(
             )
 
         if answer.chart_params and web_app_base_url and s3client:
-            web_app = WebApp(WebAppTypes.CHART_PAGE, web_app_base_url, s3client)
-            page_url = web_app.create_and_save(answer)
-            chart_button = InlineKeyboardButton(
-                text=message_text_for("answer_open_chart_button"),
-                web_app=WebAppInfo(url=page_url),
-            )
-
+            try:
+                web_app = WebApp(WebAppTypes.CHART_PAGE, web_app_base_url, s3client)
+                page_url = web_app.create_and_save(answer)
+                chart_button = InlineKeyboardButton(
+                    text=message_text_for("answer_open_chart_button"),
+                    web_app=WebAppInfo(url=page_url),
+                )
+            except Exception as e:
+                logger.error("failed to create_and_save", str(e),  exc_info=True)
+                chart_button = None
+                
         keyboard = []
         if sql_button:
             keyboard.append(sql_button)
@@ -153,7 +157,7 @@ def __get__ask_brain_handler__(
         await context.bot.send_message(
             chat_id, message_text_for("continue_dialog"), parse_mode="HTML"
         )
-        
+
         StatisticWriter.true_successful(statistic, chat_id, message_id, answer.sql_script)
 
     return __ask_brain_handler__
