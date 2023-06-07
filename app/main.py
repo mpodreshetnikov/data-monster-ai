@@ -81,7 +81,15 @@ def __configure_llm__(config: ConfigParser) -> BaseLanguageModel:
 
 def __configure_client_db__(config: ConfigParser) -> SQLDatabase:
     url = URL.create(
-        drivername=config.get("client_db", "drivername", fallback="postgresql"),
+        drivername=config.get("client_db", "sync_drivername", fallback="postgresql"),
+        username=config.get("client_db", "username"),
+        password=config.get("client_db", "password"),
+        host=config.get("client_db", "host"),
+        port=config.getint("client_db", "port"),
+        database=config.get("client_db", "database"),
+    )
+    aurl = URL.create(
+        drivername=config.get("client_db", "async_drivername", fallback="postgresql"),
         username=config.get("client_db", "username"),
         password=config.get("client_db", "password"),
         host=config.get("client_db", "host"),
@@ -90,7 +98,7 @@ def __configure_client_db__(config: ConfigParser) -> SQLDatabase:
     )
     schema = config.get("client_db", "schema")
     include_tables = config.get("client_db", "tables_to_use").split(",")
-    return MultischemaSQLDatabase.from_uri(url, schema=schema, include_tables=include_tables)
+    return MultischemaSQLDatabase.from_uri(url, aurl, schema=schema, include_tables=include_tables)
 
 
 def __configure_logger__(config: ConfigParser, log_filename: str = "log.txt"):

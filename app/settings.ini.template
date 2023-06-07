@@ -17,7 +17,8 @@ drivername = sqlite
 database = name.sqlite
 
 [client_db]
-drivername = postgresql
+sync_drivername = postgresql
+async_drivername = postgresql+asyncpg
 username = db_user
 password = qwerty12345
 host = 1.1.1.1
