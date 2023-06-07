@@ -14,12 +14,13 @@ class StatisticWriter:
                 with open(statistic, "a", encoding="utf-8", newline="") as f:
                     writer = csv.writer(f)
                     if f.tell() == 0:  # Check if the file is empty
-                        writer.writerow(["unique_message_id", "Timestamp", "User", "Question", "Successful", "SQL", "Error"])
+                        writer.writerow(["unique_message_id", "Timestamp", "User", "Question", "Successful", "SQL", "Answer", "Error"])
                     writer.writerow([
                         f"{chat_id}_{message_id}",
                         timestamp,
                         f"{username}:{user_id}",
                         question,
+                        None,
                         None,
                         None,
                         None,
@@ -39,12 +40,11 @@ class StatisticWriter:
                     unique_message_id_index = header.index("unique_message_id")
                     field_index = header.index(field_name)
                     for row in rows[1:]:  # Skip header row
-                        if row:
-                            if row[unique_message_id_index] == unique_message_id:
-                                if len(row) < len(header):  # Fill empty values if row length is less than header length
-                                    row.extend([''] * (len(header) - len(row)))
-                                row[field_index] = field_value
-                                break
+                        if row and row[unique_message_id_index] == unique_message_id:
+                            if len(row) < len(header):  # Fill empty values if row length is less than header length
+                                row.extend([''] * (len(header) - len(row)))
+                            row[field_index] = field_value
+                            break
                     f.seek(0)  # Move the file pointer to the beginning
                     writer = csv.writer(f)
                     writer.writerows(rows)
@@ -53,9 +53,10 @@ class StatisticWriter:
             logger.error(f"Failed to update {field_name} field in CSV file:", str(e), exc_info=True)
 
     @staticmethod
-    def true_successful(statistic: str, chat_id: str, message_id: str, sql_script: str):
+    def true_successful(statistic: str, chat_id: str, message_id: str, sql_script: str, answer:str):
         StatisticWriter.update_field(statistic, chat_id, message_id, "Successful", "True")
         StatisticWriter.update_field(statistic, chat_id, message_id, "SQL", sql_script)
+        StatisticWriter.update_field(statistic, chat_id, message_id, "Answer", answer)
 
     @staticmethod
     def false_successful(statistic: str, chat_id: str, message_id: str, error: str):
