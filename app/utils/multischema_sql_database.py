@@ -121,7 +121,7 @@ class MultischemaSQLDatabase(SQLDatabase):
                     if schemas:
                         self._metadata.reflect(
                             views=view_support,
-                            bind=self._async_engine,
+                            bind=self._engine,
                             only=[table_name],
                             schema=schemas[0],
                         )

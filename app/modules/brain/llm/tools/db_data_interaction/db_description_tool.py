@@ -105,7 +105,7 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
             """Format the error message"""
             return f"Error: {e}"
 
-    async def _arun(  # TODO change
+    async def _arun(
         self,
         table_name: str,
         tool_input: str = "",

@@ -94,7 +94,7 @@ class Brain:
         try:
             answer.chart_params = await self.__provide_chart_params(answer, ray_logger=ray_logger)
             if answer.chart_params:
-                answer.chart_data = self.__get_chart_data(answer)
+                answer.chart_data = await self.__get_chart_data(answer)
         except Exception:
             answer.chart_params = None
 
@@ -209,17 +209,21 @@ class Brain:
 
         if not answer or not answer.sql_script:
             return _DEFAULT
-        
+
         sql = update_limit(answer.sql_script, _EXAMPLES_LIMIT)
+        
         try:
-            with self.db._engine.connect() as connection:
-                data: list[dict] = connection.execute(text(sql)).mappings().all()
+            async with self.db._async_engine.begin() as connection:
+                result = await connection.execute(text(sql))
+                rows = result.fetchall()
+                columns = result.keys()
+                data: list[dict] = [dict(zip(columns, row)) for row in rows]
         except Exception:
             logger.warning("Failed to execute sql for chart example data", exc_info=True)
             return _DEFAULT
-        if not data or len(data) == 0:
+        if not data:
             return _DEFAULT
-        
+
         data_example = build_data_example_for_prompt(data, _EXAMPLES_LIMIT)
 
         chain = LLMChain(llm=llm or self.default_llm, prompt=GET_CHART_PARAMS_PROMPT, verbose=self._verbose)
@@ -234,7 +238,7 @@ class Brain:
 
         return result
     
-    def __get_chart_data(self, answer: Answer) -> list[dict] | None:
+    async def __get_chart_data(self, answer: Answer) -> list[dict] | None:
         _DEFAULT: list[dict] | None = None
 
         if not answer.chart_params:
@@ -244,15 +248,18 @@ class Brain:
             logger.warning("Failed to update sql with limit")
             return _DEFAULT
         try:
-            with self.db._engine.connect() as connection:
-                data: list[dict] = connection.execute(text(sql)).mappings().all()
+            async with self.db._async_engine.begin() as connection:
+                result = await connection.execute(text(sql))
+                rows = result.fetchall()
+                columns = result.keys()
+                data: list[dict] = [dict(zip(columns, row)) for row in rows]
         except Exception:
             logger.warning("Failed to execute sql for chart data", exc_info=True)
             return _DEFAULT
-        
+
         if not data:
             return _DEFAULT
-        
+
         if not answer.chart_params.label_column or answer.chart_params.label_column not in data[0].keys():
             logger.warning("Failed to find label column in data")
             return _DEFAULT
@@ -260,9 +267,9 @@ class Brain:
         if not answer.chart_params.value_columns:
             logger.warning("Failed to find value columns")
             return _DEFAULT
-        
+
         supported_value_columns = list(filter(lambda column: column in data[0].keys(), answer.chart_params.value_columns))
-        if len(supported_value_columns) == 0:
+        if not supported_value_columns:
             logger.warning("Failed to find any of value columns in data")
             return _DEFAULT
 
