@@ -158,7 +158,7 @@ def __get__ask_brain_handler__(
             chat_id, message_text_for("continue_dialog"), parse_mode="HTML"
         )
 
-        StatisticWriter.true_successful(statistic, chat_id, message_id, answer.sql_script)
+        StatisticWriter.true_successful(statistic, chat_id, message_id, answer.sql_script, answer.answer_text)
 
     return __ask_brain_handler__
 
