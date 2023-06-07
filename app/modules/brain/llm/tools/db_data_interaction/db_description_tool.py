@@ -105,6 +105,14 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
             """Format the error message"""
             return f"Error: {e}"
 
+    async def _arun(
+        self,
+        table_name: str,
+        tool_input: str = "",
+        run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
+    ) -> str:
+        self._run(table_name, tool_input, run_manager)
+
     ### Method was taken from InfoSQLDatabaseTool and modified to include column comments ###
     def __get_table_info(self, table_names):
         all_table_names = self.db.get_usable_table_names()
