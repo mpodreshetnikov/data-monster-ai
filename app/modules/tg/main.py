@@ -17,16 +17,16 @@ logger = logging.getLogger(__name__)
 
 
 def run_bot_and_block_thread(
-        token: str,
-        brain: Brain,
-        internal_db: InternalDB,
-        users_whitelist: list[str] | None = None,
-        web_app_base_url: str | None = None,
-        s3client: S3Client | None = None,
-        statistic:str| None = None,
-    ):
+    token: str,
+    brain: Brain,
+    internal_db: InternalDB,
+    users_whitelist: list[str] | None = None,
+    web_app_base_url: str | None = None,
+    s3client: S3Client | None = None,
+):
     application = __setup_application__(
-        token, brain, internal_db, users_whitelist, web_app_base_url, s3client, statistic)
+        token, brain, internal_db, users_whitelist, web_app_base_url, s3client
+    )
     logger.info("Running telegram bot...")
     application.run_polling()
 
@@ -51,20 +51,18 @@ async def stop_bot(application: Application):
 
 
 def __setup_application__(
-        token: str,
-        brain: Brain,
-        internal_db: InternalDB,
-        users_whitelist: list[str] | None = None,
-        web_app_base_url: str | None = None,
-        s3client: S3Client | None = None,
-        statistic:str| None = None,
-    ) -> Application:
+    token: str,
+    brain: Brain,
+    internal_db: InternalDB,
+    users_whitelist: list[str] | None = None,
+    web_app_base_url: str | None = None,
+    s3client: S3Client | None = None,
+) -> Application:
     __location__ = os.path.realpath(
-        os.path.join(os.getcwd(), os.path.dirname(__file__)))
+        os.path.join(os.getcwd(), os.path.dirname(__file__))
+    )
 
-    application = ApplicationBuilder().token(token)\
-        .concurrent_updates(True)\
-        .build()
+    application = ApplicationBuilder().token(token).concurrent_updates(True).build()
 
     set_texts_config_file_path(os.path.join(__location__, "tg_texts.json"))
     if users_whitelist:
@@ -73,7 +71,8 @@ def __setup_application__(
     # Handlers, required order
     init_chat_handler.add_handlers(application)
     brain_handlers.add_handlers(
-        application, brain, internal_db, web_app_base_url, s3client, statistic)
-    error_handlers.add_handlers(application, statistic)
+        application, brain, internal_db, web_app_base_url, s3client
+    )
+    error_handlers.add_handlers(application, internal_db)
 
     return application

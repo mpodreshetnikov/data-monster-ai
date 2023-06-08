@@ -2,8 +2,7 @@ import logging
 import json
 import csv
 import datetime
-
-
+import uuid
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import (
@@ -25,7 +24,6 @@ from modules.data_access.main import InternalDB
 from modules.data_access.models.brain_response_data import BrainResponseData
 from ..web_app.main import WebApp, WebAppTypes
 from ..utils.button_id import ButtonId
-from ..utils.statistics_writer import StatisticWriter 
 
 logger = logging.getLogger(__name__)
 
@@ -36,14 +34,11 @@ def add_handlers(
     internal_db: InternalDB,
     web_app_base_url: str | None = None,
     s3client: S3Client | None = None,
-    statistic: str | None = None,
 ):
     application.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
-            __get__ask_brain_handler__(
-                brain, web_app_base_url, s3client, statistic
-            ),
+            __get__ask_brain_handler__(brain, web_app_base_url, s3client, internal_db),
         )
     )
 
@@ -58,7 +53,7 @@ def __get__ask_brain_handler__(
     brain: Brain,
     web_app_base_url: str | None = None,
     s3client: S3Client | None = None,
-    statistic: str | None = None,
+    internal_db: InternalDB | None = None,
 ):
     if not web_app_base_url:
         logger.warning("No web_app_base_url provided, chart page will not be available")
@@ -80,12 +75,19 @@ def __get__ask_brain_handler__(
             else None
         )
 
+        ray_id = str(uuid.uuid4())
+        context.user_data["ray_id"] = ray_id
         if not chat_id or not user_id or not question or not message_id:
-            raise Exception("Empty chat_id or message_id or user_id or question provided")
+            raise Exception(
+                "Empty chat_id or message_id or user_id or question provided"
+            )
 
         username = update.effective_user.username if update.effective_user else None
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        StatisticWriter.add_statistic(statistic, chat_id, message_id, username, user_id, question)
+        await internal_db.user_request_repository.add(
+            ray_id=ray_id, timestamp=timestamp, username=username, user_id=user_id
+        )
 
         logger.info(f"User {username}:{user_id} asked a question {question}")
 
@@ -106,7 +108,7 @@ def __get__ask_brain_handler__(
         exec_info_storage_key = f"{chat_id}_{user_id}"
         exec_info_storage.start(exec_info_storage_key)
 
-        answer = await brain.answer(question)
+        answer = await brain.answer(question, ray_id)
 
         logger.info(
             f"User {username}:{user_id} got brain answer: {str(answer.answer_text)}"
@@ -132,9 +134,9 @@ def __get__ask_brain_handler__(
                     web_app=WebAppInfo(url=page_url),
                 )
             except Exception as e:
-                logger.error("failed to create_and_save", str(e),  exc_info=True)
+                logger.error("failed to create_and_save", str(e), exc_info=True)
                 chart_button = None
-                
+
         keyboard = []
         if sql_button:
             keyboard.append(sql_button)
@@ -158,7 +160,9 @@ def __get__ask_brain_handler__(
             chat_id, message_text_for("continue_dialog"), parse_mode="HTML"
         )
 
-        StatisticWriter.true_successful(statistic, chat_id, message_id, answer.sql_script, answer.answer_text)
+        await internal_db.request_outcome_repository.add(
+            ray_id=ray_id, successful=True, error=None
+        )
 
     return __ask_brain_handler__
 

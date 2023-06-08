@@ -31,12 +31,10 @@ def main():
 
     s3client = __configure_s3(config)
 
-    run_in_console = config.getboolean(
-        "debug", "run_in_console", fallback=False)
+    run_in_console = config.getboolean("debug", "run_in_console", fallback=False)
     if run_in_console:
         __run_bot_in_console_and_block_thread__(brain)
 
-    
     __run_bot_and_block_thread__(config, brain, internal_db, s3client)
 
 
@@ -46,13 +44,20 @@ def __run_bot_in_console_and_block_thread__(brain: Brain):
         brain.answer(question)
 
 
-def __run_bot_and_block_thread__(config: ConfigParser, brain: Brain, internal_db: InternalDB, s3client: S3Client):
+def __run_bot_and_block_thread__(
+    config: ConfigParser, brain: Brain, internal_db: InternalDB, s3client: S3Client
+):
     tg_bot_token = config.get("tg", "bot_token")
     tg_users_whitelist = config.get("tg", "whitelist").split(",")
-    statistic = config.get("common", "statistic")
     tg_web_app_storage_base_link = config.get("tg", "web_app_storage_base_link")
     tg.run_bot_and_block_thread(
-        tg_bot_token, brain, internal_db, tg_users_whitelist, tg_web_app_storage_base_link, s3client, statistic)
+        tg_bot_token,
+        brain,
+        internal_db,
+        tg_users_whitelist,
+        tg_web_app_storage_base_link,
+        s3client,
+    )
 
 
 def __configure_brain__(config: ConfigParser) -> Brain:
@@ -98,7 +103,9 @@ def __configure_client_db__(config: ConfigParser) -> SQLDatabase:
     )
     schema = config.get("client_db", "schema")
     include_tables = config.get("client_db", "tables_to_use").split(",")
-    return MultischemaSQLDatabase.from_uri(url, aurl, schema=schema, include_tables=include_tables)
+    return MultischemaSQLDatabase.from_uri(
+        url, aurl, schema=schema, include_tables=include_tables
+    )
 
 
 def __configure_logger__(config: ConfigParser, log_filename: str = "log.txt"):
@@ -123,10 +130,22 @@ def __configure_logger__(config: ConfigParser, log_filename: str = "log.txt"):
 
 def __configure_engine__(config: ConfigParser) -> InternalDB:
     url = URL.create(
-        drivername=config.get("internal_db", "drivername", fallback="sqlite"),
+        drivername=config.get("internal_db", "sync_drivername", fallback="postgresql"),
+        username=config.get("internal_db", "username"),
+        password=config.get("internal_db", "password"),
+        host=config.get("internal_db", "host"),
+        port=config.getint("internal_db", "port"),
         database=config.get("internal_db", "database"),
     )
-    return InternalDB(url)
+    aurl = URL.create(
+        drivername=config.get("internal_db", "async_drivername", fallback="postgresql"),
+        username=config.get("internal_db", "username"),
+        password=config.get("internal_db", "password"),
+        host=config.get("internal_db", "host"),
+        port=config.getint("internal_db", "port"),
+        database=config.get("internal_db", "database"),
+    )
+    return InternalDB(url, aurl)
 
 
 def __configure_s3(config: ConfigParser):
@@ -134,10 +153,10 @@ def __configure_s3(config: ConfigParser):
     secret_key = config.get("s3", "secret_key")
     endpoint_url = config.get("s3", "endpoint_url")
     client = boto3.client(
-        's3',
+        "s3",
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
-        endpoint_url=endpoint_url
+        endpoint_url=endpoint_url,
     )
 
     # test connection

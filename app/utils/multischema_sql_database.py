@@ -4,7 +4,7 @@ import logging
 from typing import Any, List, Optional
 
 from langchain import SQLDatabase
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import (
     MetaData,
     text,
@@ -44,7 +44,7 @@ class MultischemaSQLDatabase(SQLDatabase):
         self._custom_table_info = custom_table_info
         self.view_support = view_support
         self._inspector = inspect(self._engine)
-        
+
         if include_tables and ignore_tables:
             raise ValueError("Cannot specify both include_tables and ignore_tables")
 
@@ -56,30 +56,33 @@ class MultischemaSQLDatabase(SQLDatabase):
             for schema in all_schemas:
                 self._all_tables.update(self._inspector.get_table_names(schema=schema))
 
-        self._include_tables = set(self.include_tables) if self.include_tables else set()
+        self._include_tables = (
+            set(self.include_tables) if self.include_tables else set()
+        )
         self._ignore_tables = set(self.ignore_tables) if self.ignore_tables else set()
         self._usable_tables = self._get_usable_table_names()
         self._validate_table_names(self._include_tables, self._all_tables)
         self._validate_table_names(self._ignore_tables, self._all_tables)
         self._reflect_tables_in_metadata(self.view_support)
-        
+
     def _get_usable_table_names(self) -> List[str]:
         if self._include_tables:
             missing_tables = self._include_tables - self._all_tables
             if missing_tables:
-                raise ValueError(f"include_tables {missing_tables} not found in database")
+                raise ValueError(
+                    f"include_tables {missing_tables} not found in database"
+                )
             return list(self._include_tables)
         elif self._ignore_tables:
             return list(self._all_tables - self._ignore_tables)
         else:
             return list(self._all_tables)
-    
-    def _validate_table_names(self, tables,  all_tables):
+
+    def _validate_table_names(self, tables, all_tables):
         if tables:
             if missing_tables := tables - all_tables:
                 raise ValueError(f"Tables {missing_tables} not found in database")
-    
-    
+
     def _reflect_tables_in_metadata(self, view_support: bool):
         """
         Функция выполняет отражение таблиц в метаданных на основе списка usable_tables.
@@ -131,7 +134,6 @@ class MultischemaSQLDatabase(SQLDatabase):
                         )
                         raise ValueError(f"Схема не найдена для таблицы {table_name}")
 
-
     async def arun(self, command: str, fetch: str = "all") -> str:
         """Execute a SQL command and return a string representing the results.
 
@@ -145,9 +147,13 @@ class MultischemaSQLDatabase(SQLDatabase):
                         f"ALTER SESSION SET search_path='{self._schema}'"
                     )
                 elif self.dialect == "bigquery":
-                    await connection.exec_driver_sql(f"SET @@dataset_id='{self._schema}'")
+                    await connection.exec_driver_sql(
+                        f"SET @@dataset_id='{self._schema}'"
+                    )
                 else:
-                    await connection.exec_driver_sql(f"SET search_path TO {self._schema}")
+                    await connection.exec_driver_sql(
+                        f"SET search_path TO {self._schema}"
+                    )
             cursor = await connection.execute(text(command))
             if cursor.returns_rows:
                 if fetch == "all":
@@ -158,17 +164,21 @@ class MultischemaSQLDatabase(SQLDatabase):
                     raise ValueError("Fetch parameter must be either 'one' or 'all'")
                 return str(result)
         return ""
-    
+
     @classmethod
     def from_uri(
-        cls, database_uri: str, database_auri: str, engine_args: Optional[dict] = None, **kwargs: Any
+        cls,
+        database_uri: str,
+        database_auri: str,
+        engine_args: Optional[dict] = None,
+        **kwargs: Any,
     ) -> SQLDatabase:
         """Construct a SQLAlchemy engine from URI."""
         _engine_args = engine_args or {}
         sync_engine = create_engine(database_uri, **_engine_args)
         async_engine = create_async_engine(database_auri, **_engine_args)
         return cls(sync_engine, async_engine, **kwargs)
-    
+
     async def arun_no_throw(self, command: str, fetch: str = "all") -> str:
         """Execute a SQL command and return a string representing the results.
 
