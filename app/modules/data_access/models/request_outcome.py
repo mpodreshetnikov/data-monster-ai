@@ -7,6 +7,7 @@ class RequestOutcome(Base):
     __tablename__ = "request_outcome"
 
     ray_id = Column(String, ForeignKey("user_request.ray_id"), primary_key=True)
+    # comment: by default is Nullable. do we really need nullable here?
     successful = Column(Boolean)
     error = Column(String)
 
