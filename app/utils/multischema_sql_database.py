@@ -1,3 +1,4 @@
+# comment: why multischema is not in any of modules? also it is not utility.
 from typing import List, Optional
 import logging
 
@@ -56,12 +57,14 @@ class MultischemaSQLDatabase(SQLDatabase):
             for schema in all_schemas:
                 self._all_tables.update(self._inspector.get_table_names(schema=schema))
 
+        # comment: do it in one line like _ignore_tables for consistency
         self._include_tables = (
             set(self.include_tables) if self.include_tables else set()
         )
         self._ignore_tables = set(self.ignore_tables) if self.ignore_tables else set()
         self._usable_tables = self._get_usable_table_names()
         self._validate_table_names(self._include_tables, self._all_tables)
+        # why we need validate _include_tables and _ignore_tables? think it's enough to validate _usable_tables.
         self._validate_table_names(self._ignore_tables, self._all_tables)
         self._reflect_tables_in_metadata(self.view_support)
 
@@ -84,6 +87,7 @@ class MultischemaSQLDatabase(SQLDatabase):
                 raise ValueError(f"Tables {missing_tables} not found in database")
 
     def _reflect_tables_in_metadata(self, view_support: bool):
+        # comment: let's comment in english
         """
         Функция выполняет отражение таблиц в метаданных на основе списка usable_tables.
 
@@ -102,6 +106,7 @@ class MultischemaSQLDatabase(SQLDatabase):
                     only=[table_name],
                     schema=self._schema,
                 )
+        # comment: you don't need nested code here. Just do 'return' after 'if' and remove 'else'.
         else:
             with self._engine.connect() as connection:
                 for table_name in self._usable_tables:
@@ -118,9 +123,10 @@ class MultischemaSQLDatabase(SQLDatabase):
                             exc_info=True,
                         )
                         raise ValueError(
+                            # comment: let's throw errors in english
                             f"Найдено более одной схемы для таблицы {table_name}"
                         )
-
+                    # comment: firstly let's do all validation (if len == 1) then do the rest
                     if schemas:
                         self._metadata.reflect(
                             views=view_support,
@@ -132,6 +138,7 @@ class MultischemaSQLDatabase(SQLDatabase):
                         logger.error(
                             f"Schema not found for table {table_name}", exc_info=True
                         )
+                        # comment: let's throw errors in english
                         raise ValueError(f"Схема не найдена для таблицы {table_name}")
 
     async def arun(self, command: str, fetch: str = "all") -> str:
