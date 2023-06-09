@@ -31,25 +31,6 @@ def run_bot_and_block_thread(
     application.run_polling()
 
 
-async def start_bot(token: str):
-    application = __setup_application__(token)
-
-    logger.info("Starting telegram bot...")
-    await application.initialize()
-    await application.start()
-    await application.updater.start_polling()
-    logger.info("Telegram bot started")
-    return application
-
-
-async def stop_bot(application: Application):
-    logger.info("Stopping telegram bot...")
-    await application.updater.stop()
-    await application.stop()
-    await application.shutdown()
-    logger.info("Telegram bot stopped")
-
-
 def __setup_application__(
     token: str,
     brain: Brain,

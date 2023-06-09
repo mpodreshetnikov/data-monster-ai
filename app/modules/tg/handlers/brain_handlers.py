@@ -1,5 +1,6 @@
 import logging
 import json
+# comment: unused import
 import csv
 import datetime
 import uuid
@@ -66,7 +67,7 @@ def __get__ask_brain_handler__(
     async def __ask_brain_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id if update.effective_chat else None
         user_id = update.effective_user.id if update.effective_user else None
-        message_id = update.message.message_id if update.effective_message else None
+        message_id = update.effective_message.message_id if update.effective_message else None
         question = (
             " ".join(context.args)
             if context.args
@@ -76,15 +77,18 @@ def __get__ask_brain_handler__(
         )
 
         ray_id = str(uuid.uuid4())
+        # comment: what if the bot will also be in group chats and ask questions there? hm.. let's leave todo about that
         context.user_data["ray_id"] = ray_id
         if not chat_id or not user_id or not question or not message_id:
-            raise Exception(
+            raise ValueError(
                 "Empty chat_id or message_id or user_id or question provided"
             )
 
         username = update.effective_user.username if update.effective_user else None
+        # comment: what's timezone?
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+        # comment: handle errors
         await internal_db.user_request_repository.add(
             ray_id=ray_id, timestamp=timestamp, username=username, user_id=user_id
         )
@@ -160,6 +164,7 @@ def __get__ask_brain_handler__(
             chat_id, message_text_for("continue_dialog"), parse_mode="HTML"
         )
 
+        # comment: do we need to handle errors here?
         await internal_db.request_outcome_repository.add(
             ray_id=ray_id, successful=True, error=None
         )
@@ -171,13 +176,16 @@ async def show_sql_callback(
     update: Update, context: ContextTypes.DEFAULT_TYPE, internal_db: InternalDB
 ):
     query = update.callback_query
+    # comment: check if query is None
     await query.answer()
     answer_without_sql = query.message.text
     callback_data = json.loads(query.data)
     ray_id = callback_data["ray_id"]
 
+    # comment: use async methods to get data from database
     with internal_db.Session() as session:
         brain_response_data = (
+            # comment: with new links between brain ersponse and user request, we need take the first brain response or smth else?
             session.query(BrainResponseData).filter_by(ray_id=ray_id).first()
         )
         reply_markup = query.message.reply_markup
@@ -199,6 +207,7 @@ async def show_sql_callback(
             )
             await query.edit_message_text(text=answer_with_sql)
         else:
+            # comment: here you clearing user's message, but you need to add the exception at the message's end.
             await query.edit_message_text(
                 text=message_text_for("not_found_script_error")
             )

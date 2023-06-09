@@ -38,6 +38,7 @@ from modules.common.sql_helpers import update_limit
 
 from modules.data_access.main import InternalDB
 
+# comment: unused imports
 from modules.data_access.models.brain_response_data import BrainResponseData
 
 
@@ -143,6 +144,7 @@ class Brain:
                 )
             except OutputParserException as e:
                 logger.error("Parser cannot parse AI answer", exc_info=True)
+                # comment: do we need now to setup additional info (ray_id) to exception?
                 e = add_info_to_exception(e, "ray_id", ray_logger.get_ray_str())
                 raise e
             except InvalidRequestError as e:

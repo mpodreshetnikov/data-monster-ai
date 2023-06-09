@@ -5,7 +5,7 @@ from sqlalchemy_utils import database_exists, create_database
 from .repositories.user_request_repository import UserRequestRepository
 from .repositories.brain_response_repository import BrainResponseRepository
 from .repositories.request_outcome_repository import RequestOutcomeRepository
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from .models.base import Base
 
 

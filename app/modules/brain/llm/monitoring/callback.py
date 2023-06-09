@@ -14,6 +14,7 @@ class LogLLMRayCallbackHandler(BaseCallbackHandler):
     def __init__(self, log_path: str) -> None:
         self.log_path = log_path
 
+    # comment: returned value may be None
     def get_sql_script(self) -> str:
         """
         Returns the SQL script.
@@ -30,6 +31,7 @@ class LogLLMRayCallbackHandler(BaseCallbackHandler):
         parent_run_id: UUID | None = None,
         **kwargs: Any,
     ) -> Any:
+        # comment: where ray id? how this logger works now at all?
         if self.log_path:
             prompt = prompts[0]
             header_str = (

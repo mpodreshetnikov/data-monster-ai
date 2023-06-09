@@ -1,8 +1,6 @@
 # comment: why multischema is not in any of modules? also it is not utility.
-from typing import List, Optional
-import logging
-
 from typing import Any, List, Optional
+import logging
 
 from langchain import SQLDatabase
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -24,6 +22,7 @@ class MultischemaSQLDatabase(SQLDatabase):
     def __init__(
         self,
         sync_engine: Engine,
+        # comment: async_engine is AsyncEngine, not just Engine
         async_engine: Engine,
         schema: Optional[str] = None,
         metadata: Optional[MetaData] = None,
@@ -126,7 +125,7 @@ class MultischemaSQLDatabase(SQLDatabase):
                             # comment: let's throw errors in english
                             f"Найдено более одной схемы для таблицы {table_name}"
                         )
-                    # comment: firstly let's do all validation (if len == 1) then do the rest
+                    # comment: firstly let's do all validation (if len == 0) then do the rest
                     if schemas:
                         self._metadata.reflect(
                             views=view_support,
@@ -164,6 +163,7 @@ class MultischemaSQLDatabase(SQLDatabase):
             cursor = await connection.execute(text(command))
             if cursor.returns_rows:
                 if fetch == "all":
+                    # comment: is await needed here too? when fetching
                     result = cursor.fetchall()
                 elif fetch == "one":
                     result = cursor.fetchone()[0]  # type: ignore
@@ -172,6 +172,8 @@ class MultischemaSQLDatabase(SQLDatabase):
                 return str(result)
         return ""
 
+    # comment: you overriding method, but require async uri, so
+    # let's rename the method like from_uri_async or smth like this?
     @classmethod
     def from_uri(
         cls,
@@ -197,5 +199,4 @@ class MultischemaSQLDatabase(SQLDatabase):
         try:
             return await self.arun(command, fetch)
         except SQLAlchemyError as e:
-            """Format the error message"""
             return f"Error: {e}"

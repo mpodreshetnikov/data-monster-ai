@@ -5,6 +5,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# comment: StatisticWriter is not used anywhere, let's remove it.
 class StatisticWriter:
     @staticmethod
     def add_statistic(statistic: str, chat_id: str, message_id: str, username: str, user_id: str, question: str):

@@ -36,6 +36,13 @@ class WebApp:
         return url
 
     def __build_page__(self, answer: Answer) -> str:
+        if not answer:
+            raise ValueError("Answer is None")
+        if not answer.chart_data or not answer.chart_params:
+            raise ValueError("Chart data is None")
+        if not answer.chart_params.label_column:
+            raise ValueError("Chart label column is None")
+
         if self.type == WebAppTypes.CHART_PAGE:
             return build_chart_page(
                 answer.chart_data,
@@ -43,6 +50,7 @@ class WebApp:
                 answer.chart_params.chart_type.value,
                 answer.question
             )
+
         raise NotImplementedError(
             f"WebApp type {self.type} is not implemented")
 
