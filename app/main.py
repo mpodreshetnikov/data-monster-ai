@@ -7,6 +7,7 @@ from langchain.chat_models import ChatOpenAI
 from langchain.base_language import BaseLanguageModel
 from mypy_boto3_s3 import S3Client
 from sqlalchemy import URL
+import json
 import boto3
 
 import modules.tg.main as tg
@@ -90,7 +91,8 @@ def __configure_client_db__(config: ConfigParser) -> SQLDatabase:
     )
     schema = config.get("client_db", "schema")
     include_tables = config.get("client_db", "tables_to_use").split(",")
-    return MultischemaSQLDatabase.from_uri(url, schema=schema, include_tables=include_tables)
+    connect_args =  json.loads(config.get("client_db", "connect_args"))
+    return MultischemaSQLDatabase.from_uri(url, engine_args= {"connect_args": connect_args}, schema=schema, include_tables=include_tables)
 
 
 def __configure_logger__(config: ConfigParser, log_filename: str = "log.txt"):

@@ -1,6 +1,5 @@
 from typing import List, Optional
 import logging
-import asyncio
 
 from langchain import SQLDatabase
 
@@ -9,8 +8,9 @@ from sqlalchemy import (
     inspect,
     text,
 )
+
 from sqlalchemy.engine import Engine
-from sqlalchemy.exc import ProgrammingError, SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, OperationalError
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +31,7 @@ class MultischemaSQLDatabase(SQLDatabase):
         view_support: bool = False,
     ):
         if schema:
-            super().__init__(
-                engine, schema, metadata, ignore_tables, include_tables
-            )
+            super().__init__(engine, schema, metadata, ignore_tables, include_tables)
             return
 
         self._schema = None
@@ -157,23 +155,59 @@ class MultischemaSQLDatabase(SQLDatabase):
             if missing_tables := tables - all_tables:
                 raise ValueError(f"Tables {missing_tables} not found in database")
 
+    def run(self, command: str, fetch: str = "all") -> str:
+        """Execute a SQL command and return a string representing the results.
+
+        If the statement returns rows, a string of the results is returned.
+        If the statement returns no rows, an empty string is returned.
+        """
+        try:
+            with self._engine.begin() as connection:
+                if self._schema is not None:
+                    if self.dialect == "snowflake":
+                        connection.exec_driver_sql(
+                            f"ALTER SESSION SET search_path='{self._schema}'"
+                        )
+                    elif self.dialect == "bigquery":
+                        connection.exec_driver_sql(f"SET @@dataset_id='{self._schema}'")
+                    else:
+                        connection.exec_driver_sql(f"SET search_path TO {self._schema}")
+                cursor = connection.execute(text(command))
+                if cursor.returns_rows:
+                    if fetch == "all":
+                        result = cursor.fetchall()
+                    elif fetch == "one":
+                        result = cursor.fetchone()[0]  # type: ignore
+                    else:
+                        raise ValueError(
+                            "Fetch parameter must be either 'one' or 'all'"
+                        )
+                    return str(result)
+            return ""
+        except OperationalError:
+            return "SQL command execution timed out.Optimize the script"
+
     async def arun(self, command: str, fetch: str = "all") -> str:
         """Execute a SQL command and return a string representing the results.
 
         If the statement returns rows, a string of the results is returned.
         If the statement returns no rows, an empty string is returned.
         """
-        async with self._engine.begin() as connection: # TODO Create an asynchronous connection to the database
+        async with self._engine.begin() as connection:  # TODO Create an asynchronous connection to the database
             if self._schema is not None:
                 if self.dialect == "snowflake":
                     await connection.exec_driver_sql(
                         f"ALTER SESSION SET search_path='{self._schema}'"
                     )
                 elif self.dialect == "bigquery":
-                    await connection.exec_driver_sql(f"SET @@dataset_id='{self._schema}'")
+                    await connection.exec_driver_sql(
+                        f"SET @@dataset_id='{self._schema}'"
+                    )
                 else:
-                    await  connection.exec_driver_sql(f"SET search_path TO {self._schema}")
-            cursor = await  connection.execute(text(command))
+                    await connection.exec_driver_sql(
+                        f"SET search_path TO {self._schema}"
+                    )
+            cursor = await connection.execute(text(command))
             if cursor.returns_rows:
                 if fetch == "all":
                     result = await cursor.fetchall()
@@ -183,7 +217,7 @@ class MultischemaSQLDatabase(SQLDatabase):
                     raise ValueError("Fetch parameter must be either 'one' or 'all'")
                 return str(result)
         return ""
-    
+
     async def arun_no_throw(self, command: str, fetch: str = "all") -> str:
         """Execute a SQL command and return a string representing the results.
 
