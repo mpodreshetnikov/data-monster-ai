@@ -1,20 +1,26 @@
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 from langchain import LLMChain, SQLDatabase
 from langchain.base_language import BaseLanguageModel
 from langchain.embeddings.base import Embeddings
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.agents.agent_toolkits.base import BaseToolkit
-from langchain.agents.mrkl.output_parser import OutputParserException
+from langchain.schema import OutputParserException, AgentAction, AgentFinish
 from langchain.chains.base import Chain
 from langchain.chains import SimpleSequentialChain
+from langchain.callbacks.base import BaseCallbackManager
 from langchain.callbacks.manager import Callbacks
-from langchain.agents import create_sql_agent
+from langchain.agents.agent import AgentExecutor
+from langchain.agents.agent_toolkits.sql.prompt import SQL_SUFFIX
+from langchain.agents.mrkl.base import ZeroShotAgent
+from langchain.agents.mrkl.prompt import FORMAT_INSTRUCTIONS
 from langchain.callbacks import get_openai_callback
 from openai import InvalidRequestError
+
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 from modules.brain.llm.tools.db_data_interaction.toolkit import DbDataInteractionToolkit
 from modules.brain.llm.prompts.sql_agent_prompts import SQL_PREFIX, get_formatted_hints, get_sql_suffix_with_hints
@@ -23,7 +29,9 @@ from modules.brain.llm.prompts.chart_prompts import GET_CHART_PARAMS_PROMPT, Cha
 from modules.brain.llm.monitoring.callback import LogLLMRayCallbackHandler
 from modules.brain.llm.parsers.custom_output_parser import CustomAgentOutputParser
 from modules.brain.llm.parsers.custom_output_parser import LastPromptSaverCallbackHandler
-from modules.common.errors import add_info_to_exception
+from modules.common.errors import (
+    add_info_to_exception, AgentLimitExceededAnswerException, SQLTimeoutAnswerException,
+    CreatedNotWorkingSQLAnswerException, NoDataReturnedFromDBAnswerException, LLMContextExceededAnswerException)
 from modules.common.sql_helpers import update_limit
 
 from modules.data_access.main import InternalDB
@@ -48,10 +56,10 @@ class Brain:
     default_llm: BaseLanguageModel
     default_embeddings: Embeddings
 
-    _prompt_log_path: str = None
+    _prompt_log_path: str | None = None
     _inheritable_llm_callbacks: Callbacks = []
     _verbose: bool = False
-    _default_sql_llm_toolkit: DbDataInteractionToolkit = None
+    _default_sql_llm_toolkit: DbDataInteractionToolkit
     _sql_query_hints_limit: int = 0
     _sql_agent_max_iterations: int = 5
 
@@ -126,6 +134,12 @@ class Brain:
                 response = await overall_chain.arun(
                     question,
                     callbacks=[last_prompt_saver, ray_logger, *self._inheritable_llm_callbacks],)
+            except AgentLimitExceededAnswerException as e:
+                if ray_logger.was_sql_timeout_error:
+                    e = SQLTimeoutAnswerException()
+                e = add_info_to_exception(
+                    e, "ray_id", ray_logger.get_ray_str())
+                raise e
             except OutputParserException as e:
                 logger.error("Parser cannot parse AI answer", exc_info=True)
                 e = add_info_to_exception(
@@ -133,14 +147,43 @@ class Brain:
                 raise e
             except InvalidRequestError as e:
                 logger.error("Error while asking OpenAI", exc_info=True)
+                if "context length" in str(e):
+                    e = LLMContextExceededAnswerException()
                 e = add_info_to_exception(
                     e, "ray_id", ray_logger.get_ray_str())
                 raise e
             except Exception as e:
+                logger.error(e, exc_info=True)
                 e = add_info_to_exception(
                     e, "ray_id", ray_logger.get_ray_str())
                 raise e
-            logger.info(openai_cb)
+            finally:
+                logger.info(openai_cb)
+        
+        # do checks even the answer is got
+        sql = ray_logger.get_sql_script()
+        if sql:
+            data = None
+            try:
+                with self.db._engine.connect() as connection:
+                    data = connection.execute(text(sql)).mappings().all()
+            except OperationalError:
+                if ray_logger.was_sql_timeout_error:
+                    e = SQLTimeoutAnswerException()
+                    e = add_info_to_exception(
+                        e, "ray_id", ray_logger.get_ray_str())
+                    raise e
+            except Exception as e:
+                logger.error(f"Error while executing SQL, ray_id: {ray_logger.get_ray_str()}", exc_info=True)
+                e = CreatedNotWorkingSQLAnswerException()
+                e = add_info_to_exception(
+                    e, "ray_id", ray_logger.get_ray_str())
+                raise e
+            if not data:
+                e = NoDataReturnedFromDBAnswerException()
+                e = add_info_to_exception(
+                    e, "ray_id", ray_logger.get_ray_str())
+                raise e
 
         return response
 
@@ -150,7 +193,7 @@ class Brain:
         db_comments_override_path: str = None,
         sql_query_examples_path: str = None,
         llm: BaseLanguageModel = None,
-    ) -> BaseToolkit:
+    ) -> DbDataInteractionToolkit:
         toolkit = DbDataInteractionToolkit(
             db=self.db,
             llm=llm or self.default_llm,
@@ -169,7 +212,7 @@ class Brain:
         self,
         question: str,
         last_prompt_saver: LastPromptSaverCallbackHandler,
-        llm: BaseLanguageModel = None
+        llm: BaseLanguageModel | None = None
     ) -> Chain:
         hints_str = get_formatted_hints(
             self._default_sql_llm_toolkit,
@@ -185,17 +228,67 @@ class Brain:
             retrying_chain_callbacks=self._inheritable_llm_callbacks,
         )
 
-        agent_executor = create_sql_agent(
+        agent_executor = self.__build_sql_agent_executor(
             llm=llm or self.default_llm,
-            toolkit=self._default_sql_llm_toolkit,
-            verbose=self._verbose,
-            prefix=SQL_PREFIX,
             suffix=agent_suffix,
             output_parser=output_parser,
-            max_iterations=self._sql_agent_max_iterations,
         )
 
         return agent_executor
+
+
+    def __build_sql_agent_executor(
+        self,
+        llm: BaseLanguageModel,
+        callback_manager: BaseCallbackManager | None = None,
+        prefix: str = SQL_PREFIX,
+        suffix: str = SQL_SUFFIX,
+        format_instructions: str = FORMAT_INSTRUCTIONS,
+        input_variables: list[str] | None = None,
+        top_k: int = 10,
+        max_execution_time: float | None = None,
+        early_stopping_method: str = "force",
+        agent_executor_kwargs: dict[str, Any] | None = None,
+        **kwargs,
+    ):
+        """
+        Build SQL agent executor.
+        Rewrite original building method to raise exception when exec limit is exceeded.
+        """
+        tools = self._default_sql_llm_toolkit.get_tools()
+        prefix = prefix.format(dialect=self._default_sql_llm_toolkit.dialect, top_k=top_k)
+        prompt = ZeroShotAgent.create_prompt(
+            tools,
+            prefix=prefix,
+            suffix=suffix,
+            format_instructions=format_instructions,
+            input_variables=input_variables,
+        )
+        llm_chain = LLMChain(
+            llm=llm,
+            prompt=prompt,
+            callback_manager=callback_manager,
+        )
+        tool_names = [tool.name for tool in tools]
+
+        class ZeroShotAgentRaising(ZeroShotAgent):
+            def return_stopped_response(
+                    self,
+                    early_stopping_method: str,
+                    intermediate_steps: list[tuple[AgentAction, str]],
+                    **kwargs: Any) -> AgentFinish:
+                raise AgentLimitExceededAnswerException()
+        agent = ZeroShotAgentRaising(llm_chain=llm_chain, allowed_tools=tool_names, **kwargs)
+        return AgentExecutor.from_agent_and_tools(
+            agent=agent,
+            tools=tools,
+            callback_manager=callback_manager,
+            verbose=self._verbose,
+            max_iterations=self._sql_agent_max_iterations,
+            max_execution_time=max_execution_time,
+            early_stopping_method=early_stopping_method,
+            **(agent_executor_kwargs or {}),
+        )
 
     def __build_lang_translator_chain(self, llm: BaseLanguageModel = None) -> Chain:
         translator_chain = LLMChain(

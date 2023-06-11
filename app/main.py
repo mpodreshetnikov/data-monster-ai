@@ -103,12 +103,13 @@ def __configure_logger__(config: ConfigParser, log_filename: str = "log.txt"):
 
     log_path = config.get("common", "log_path", fallback="logs")
     file_handler = logging.FileHandler(
-        "{0}/{1}".format(log_path, log_filename), mode="w"
+        "{0}/{1}".format(log_path, log_filename), mode="a"
     )
     file_handler.setFormatter(log_formatter)
     root_logger.addHandler(file_handler)
 
-    if verbose := config.getboolean("debug", "verbose", fallback=False):
+    verbose = config.getboolean("debug", "verbose", fallback=False)
+    if verbose:
         root_logger.setLevel(logging.INFO)
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(log_formatter)

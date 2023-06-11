@@ -6,6 +6,7 @@ from sqlalchemy.schema import CreateTable
 
 from langchain import SQLDatabase
 from langchain.agents.agent_toolkits.base import BaseToolkit
+from langchain.agents.agent_toolkits.sql.toolkit import SQLDatabaseToolkit
 from langchain.base_language import BaseLanguageModel
 from langchain.callbacks.manager import (
     CallbackManagerForToolRun,
@@ -257,22 +258,7 @@ class LightweightQuerySQLDataBaseTool(QuerySQLDataBaseTool):
         return result
 
 
-class SQLDatabaseToolkitModified(BaseToolkit):
-    """Toolkit for interacting with SQL databases."""
-
-    db: SQLDatabase = Field(exclude=True)
-    llm: BaseLanguageModel = Field(exclude=True)
-
-    @property
-    def dialect(self) -> str:
-        """Return string representation of dialect to use."""
-        return self.db.dialect
-
-    class Config:
-        """Configuration for this pydantic object."""
-
-        arbitrary_types_allowed = True
-
+class SQLDatabaseToolkitModified(SQLDatabaseToolkit):
     def get_tools(self, db_comments_override: dict) -> list[BaseTool]:
         """Get the tools in the toolkit."""
         return [

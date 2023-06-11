@@ -21,7 +21,7 @@ DB_HINT_UNKNOWN_PHRASES = [
     ]
 
 
-class DbDataInteractionToolkit(SQLDatabaseToolkitModified, BaseToolkit):
+class DbDataInteractionToolkit(SQLDatabaseToolkitModified):
     db_hints_doc_path: str = Field(default=None, description="Path to the database documentation")
     db_comments_override_path: str = Field(default=None, description="Path to the YAML file with the database comments")
     sql_query_examples_path: str = Field(default=None, description="Path to the YAML file with the query examples")

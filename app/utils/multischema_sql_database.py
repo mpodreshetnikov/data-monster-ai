@@ -10,7 +10,7 @@ from sqlalchemy import (
 )
 
 from sqlalchemy.engine import Engine
-from sqlalchemy.exc import SQLAlchemyError, OperationalError
+from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
 
@@ -161,31 +161,28 @@ class MultischemaSQLDatabase(SQLDatabase):
         If the statement returns rows, a string of the results is returned.
         If the statement returns no rows, an empty string is returned.
         """
-        try:
-            with self._engine.begin() as connection:
-                if self._schema is not None:
-                    if self.dialect == "snowflake":
-                        connection.exec_driver_sql(
-                            f"ALTER SESSION SET search_path='{self._schema}'"
-                        )
-                    elif self.dialect == "bigquery":
-                        connection.exec_driver_sql(f"SET @@dataset_id='{self._schema}'")
-                    else:
-                        connection.exec_driver_sql(f"SET search_path TO {self._schema}")
-                cursor = connection.execute(text(command))
-                if cursor.returns_rows:
-                    if fetch == "all":
-                        result = cursor.fetchall()
-                    elif fetch == "one":
-                        result = cursor.fetchone()[0]  # type: ignore
-                    else:
-                        raise ValueError(
-                            "Fetch parameter must be either 'one' or 'all'"
-                        )
-                    return str(result)
-            return ""
-        except OperationalError:
-            return "SQL command execution timed out.Optimize the script"
+        with self._engine.begin() as connection:
+            if self._schema is not None:
+                if self.dialect == "snowflake":
+                    connection.exec_driver_sql(
+                        f"ALTER SESSION SET search_path='{self._schema}'"
+                    )
+                elif self.dialect == "bigquery":
+                    connection.exec_driver_sql(f"SET @@dataset_id='{self._schema}'")
+                else:
+                    connection.exec_driver_sql(f"SET search_path TO {self._schema}")
+            cursor = connection.execute(text(command))
+            if cursor.returns_rows:
+                if fetch == "all":
+                    result = cursor.fetchall()
+                elif fetch == "one":
+                    result = cursor.fetchone()[0]  # type: ignore
+                else:
+                    raise ValueError(
+                        "Fetch parameter must be either 'one' or 'all'"
+                    )
+                return str(result)
+        return ""
 
     async def arun(self, command: str, fetch: str = "all") -> str:
         """Execute a SQL command and return a string representing the results.
