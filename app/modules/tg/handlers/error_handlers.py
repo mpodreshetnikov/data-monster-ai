@@ -8,7 +8,7 @@ from modules.tg.utils.texts import message_text_for
 from modules.common.errors import (
     get_info_from_exception, AgentLimitExceededAnswerException,
     SQLTimeoutAnswerException, CreatedNotWorkingSQLAnswerException,
-    NoDataReturnedFromDBAnswerException)
+    NoDataReturnedFromDBAnswerException, LLMContextExceededAnswerException)
 from ..utils.statistics_writer import StatisticWriter 
 
 logger = logging.getLogger(__name__)
@@ -28,8 +28,11 @@ async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     effective_message = update.effective_message
     message_id = effective_message.message_id if effective_message else None
 
-    StatisticWriter.false_successful(
-        statistic, str(chat_id), str(message_id), str(error or "unknown error"))
+    # try:
+    #     StatisticWriter.false_successful(
+    #         statistic, str(chat_id), str(message_id), str(error or "unknown error"))
+    # except Exception:
+    #     pass
 
     if not effective_message:
         logger.error("Error occured but no effective message found.")
@@ -44,6 +47,8 @@ async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         await effective_message.reply_text(message_text_for("unknown_error"), parse_mode="HTML")
         return
 
+    logger.error(error, exc_info=True)
+
     ray_id = get_info_from_exception(error, "ray_id")
 
     if isinstance(error, UserNotAllowedException):
@@ -55,30 +60,31 @@ async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             logger.error(e, exc_info=True)
         return
 
+    error_message = ""
+
     if isinstance(error, AgentLimitExceededAnswerException):
-        pass # TODO: add handler for this exception
-
+        error_message = message_text_for("error_AgentLimitExceededAnswerException")
     if isinstance(error, SQLTimeoutAnswerException):
-        pass # TODO: add handler for this exception
-
+        error_message = message_text_for("error_SQLTimeoutAnswerException")
     if isinstance(error, CreatedNotWorkingSQLAnswerException):
-        pass # TODO: add handler for this exception
-
+        error_message = message_text_for("error_CreatedNotWorkingSQLAnswerException")
     if isinstance(error, NoDataReturnedFromDBAnswerException):
-        pass # TODO: add handler for this exception
-    
-    logger.error(error, exc_info=True)
+        error_message = message_text_for("error_NoDataReturnedFromDBAnswerException")
+    if isinstance(error, LLMContextExceededAnswerException):
+        error_message = message_text_for("error_LLMContextExceededAnswerException")
+
+    if not error_message:
+        error_message = message_text_for("unknown_error")
+
+    if ray_id:
+        ray_id_text = message_text_for("ray_id_ext", ray_id=ray_id)
+        error_message += ray_id_text
+
     try:
-        if ray_id:
-            await effective_message.reply_text(
-                message_text_for("unknown_error_with_ray_id", ray_id=ray_id),
-                parse_mode="HTML")
-        else:
-            await effective_message.reply_text(
-                message_text_for("unknown_error"),
-                parse_mode="HTML")
+        await effective_message.reply_text(
+            error_message,
+            parse_mode="HTML")
     except Exception as e:
         logger.error(e, exc_info=True)
-        
 
     

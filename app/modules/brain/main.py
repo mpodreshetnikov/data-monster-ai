@@ -179,7 +179,10 @@ class Brain:
                 e = add_info_to_exception(
                     e, "ray_id", ray_logger.get_ray_str())
                 raise e
-            if not data:
+            if not data or (
+                # test if data contains only one row with one value and it is False (0, no data, empty string)
+                len(data) == 1 and len(data[0]) == 1 and not bool(list(data[0].values())[0])
+            ):
                 e = NoDataReturnedFromDBAnswerException()
                 e = add_info_to_exception(
                     e, "ray_id", ray_logger.get_ray_str())
