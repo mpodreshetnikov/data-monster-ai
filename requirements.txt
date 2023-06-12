@@ -9,5 +9,5 @@ chromadb==0.3.25
 tiktoken==0.4.0
 sqlalchemy_utils==0.41.1
 boto3==1.26.142
-boto3_stubs==1.26.142
+boto3_stubs==1.26.151
 mypy_boto3_s3==1.26.127
