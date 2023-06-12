@@ -9,10 +9,12 @@ import uuid
 
 class LogLLMRayCallbackHandler(BaseCallbackHandler):
     log_path: str | None = None
+    ray_id: str | None = None
     sql_script: str | None = None
 
-    def __init__(self, log_path: str) -> None:
+    def __init__(self, log_path: str, ray_id:str) -> None:
         self.log_path = log_path
+        self.ray_id = ray_id
 
     # comment: returned value may be None
     def get_sql_script(self) -> str:
@@ -31,7 +33,6 @@ class LogLLMRayCallbackHandler(BaseCallbackHandler):
         parent_run_id: UUID | None = None,
         **kwargs: Any,
     ) -> Any:
-        # comment: where ray id? how this logger works now at all?
         if self.log_path:
             prompt = prompts[0]
             header_str = (

@@ -1,14 +1,16 @@
-# comment: why multischema is not in any of modules? also it is not utility.
 from typing import Any, List, Optional
 import logging
 
+from typing import Any, List, Optional
+
 from langchain import SQLDatabase
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
 from sqlalchemy import (
     MetaData,
     text,
     inspect,
     create_engine,
+    URL,
 )
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
@@ -22,8 +24,7 @@ class MultischemaSQLDatabase(SQLDatabase):
     def __init__(
         self,
         sync_engine: Engine,
-        # comment: async_engine is AsyncEngine, not just Engine
-        async_engine: Engine,
+        async_engine: AsyncEngine,
         schema: Optional[str] = None,
         metadata: Optional[MetaData] = None,
         ignore_tables: Optional[List[str]] = None,
@@ -56,29 +57,15 @@ class MultischemaSQLDatabase(SQLDatabase):
             for schema in all_schemas:
                 self._all_tables.update(self._inspector.get_table_names(schema=schema))
 
-        # comment: do it in one line like _ignore_tables for consistency
-        self._include_tables = (
-            set(self.include_tables) if self.include_tables else set()
-        )
-        self._ignore_tables = set(self.ignore_tables) if self.ignore_tables else set()
-        self._usable_tables = self._get_usable_table_names()
+        self._include_tables = (set(self.include_tables) if self.include_tables else set())
         self._validate_table_names(self._include_tables, self._all_tables)
-        # why we need validate _include_tables and _ignore_tables? think it's enough to validate _usable_tables.
+        self._ignore_tables = set(self.ignore_tables) if self.ignore_tables else set()
         self._validate_table_names(self._ignore_tables, self._all_tables)
+        
+        usable_tables = self.get_usable_table_names()
+        self._usable_tables = set(usable_tables) if usable_tables else self._all_tables
         self._reflect_tables_in_metadata(self.view_support)
 
-    def _get_usable_table_names(self) -> List[str]:
-        if self._include_tables:
-            missing_tables = self._include_tables - self._all_tables
-            if missing_tables:
-                raise ValueError(
-                    f"include_tables {missing_tables} not found in database"
-                )
-            return list(self._include_tables)
-        elif self._ignore_tables:
-            return list(self._all_tables - self._ignore_tables)
-        else:
-            return list(self._all_tables)
 
     def _validate_table_names(self, tables, all_tables):
         if tables:
@@ -86,16 +73,14 @@ class MultischemaSQLDatabase(SQLDatabase):
                 raise ValueError(f"Tables {missing_tables} not found in database")
 
     def _reflect_tables_in_metadata(self, view_support: bool):
-        # comment: let's comment in english
         """
-        Функция выполняет отражение таблиц в метаданных на основе списка usable_tables.
+        This function reflects tables in metadata based on the usable_tables list.
 
         Args:
-            view_support (bool): Флаг, указывающий поддержку представлений.
+            view_support (bool): Flag indicating view support.
 
         Raises:
-            ValueError: Если найдено более одной схемы для таблицы или если схема не найдена.
-
+            ValueError: If more than one schema is found for a table or if the schema is not found.
         """
         if self._schema:
             for table_name in self._usable_tables:
@@ -105,40 +90,36 @@ class MultischemaSQLDatabase(SQLDatabase):
                     only=[table_name],
                     schema=self._schema,
                 )
-        # comment: you don't need nested code here. Just do 'return' after 'if' and remove 'else'.
-        else:
-            with self._engine.connect() as connection:
-                for table_name in self._usable_tables:
-                    query = text(
-                        "SELECT table_schema FROM information_schema.tables WHERE table_name = :table"
-                    )
-                    query = query.bindparams(table=table_name)
-                    result = connection.execute(query)
-                    schemas = [row[0] for row in result.fetchall()]
+            return
+        with self._engine.connect() as connection:
+            for table_name in self._usable_tables:
+                query = text(
+                    "SELECT table_schema FROM information_schema.tables WHERE table_name = :table"
+                )
+                query = query.bindparams(table=table_name)
+                result = connection.execute(query)
+                schemas = [row[0] for row in result.fetchall()]
 
-                    if len(schemas) > 1:
-                        logger.error(
-                            f"More than one schema found for table {table_name}",
-                            exc_info=True,
-                        )
-                        raise ValueError(
-                            # comment: let's throw errors in english
-                            f"Найдено более одной схемы для таблицы {table_name}"
-                        )
-                    # comment: firstly let's do all validation (if len == 0) then do the rest
-                    if schemas:
-                        self._metadata.reflect(
-                            views=view_support,
-                            bind=self._engine,
-                            only=[table_name],
-                            schema=schemas[0],
-                        )
-                    else:
-                        logger.error(
-                            f"Schema not found for table {table_name}", exc_info=True
-                        )
-                        # comment: let's throw errors in english
-                        raise ValueError(f"Схема не найдена для таблицы {table_name}")
+                if len(schemas) == 1:
+                    self._metadata.reflect(
+                        views=view_support,
+                        bind=self._engine,
+                        only=[table_name],
+                        schema=schemas[0],
+                    )
+                elif len(schemas) > 1:
+                    logger.error(
+                        f"More than one schema found for table {table_name}",
+                        exc_info=True,
+                    )
+                    raise ValueError(
+                        f"More than one schema found for table {table_name}"
+                    )
+                else:
+                    logger.error(
+                        f"Schema not found for table {table_name}", exc_info=True
+                    )
+                    raise ValueError(f"Schema not found for table {table_name}")
 
     async def arun(self, command: str, fetch: str = "all") -> str:
         """Execute a SQL command and return a string representing the results.
@@ -163,22 +144,19 @@ class MultischemaSQLDatabase(SQLDatabase):
             cursor = await connection.execute(text(command))
             if cursor.returns_rows:
                 if fetch == "all":
-                    # comment: is await needed here too? when fetching
                     result = cursor.fetchall()
                 elif fetch == "one":
-                    result = cursor.fetchone()[0]  # type: ignore
+                    result = cursor.fetchone()[0]
                 else:
                     raise ValueError("Fetch parameter must be either 'one' or 'all'")
                 return str(result)
         return ""
 
-    # comment: you overriding method, but require async uri, so
-    # let's rename the method like from_uri_async or smth like this?
     @classmethod
-    def from_uri(
+    def from_uri_async(
         cls,
-        database_uri: str,
-        database_auri: str,
+        database_uri: URL,
+        database_auri: URL,
         engine_args: Optional[dict] = None,
         **kwargs: Any,
     ) -> SQLDatabase:

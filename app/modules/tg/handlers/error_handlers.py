@@ -6,10 +6,7 @@ from telegram import Update
 
 from modules.tg.utils.exceptions import UserNotAllowedException
 from modules.tg.utils.texts import message_text_for
-# comment: unused imports
-from modules.common.errors import get_info_from_exception
-# comment: StatisticWriter is not used anywhere. let's remove it
-from ..utils.statistics_writer import StatisticWriter
+
 from modules.data_access.main import InternalDB
 
 logger = logging.getLogger(__name__)
@@ -28,11 +25,13 @@ async def __error_handler__(
     user_id = update.effective_user.id if update.effective_user else None
     ray_id = context.user_data["ray_id"]
 
-    # comment: catch errors
-    await internal_db.request_outcome_repository.add(
-        ray_id=ray_id, successful=False, error=error
-    )
-
+    try:
+        await internal_db.request_outcome_repository.add(
+            ray_id=ray_id, successful=False, error=error
+        )
+    except Exception as e:
+        logger.error(e, exc_info=True)
+        
     if isinstance(error, LocalProtocolError):
         # why we don't send to user any message here? it will looks like the app just not answering.
         logger.error(error, exc_info=True)

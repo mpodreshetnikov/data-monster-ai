@@ -58,7 +58,7 @@ class DbDataInteractionToolkit(SQLDatabaseToolkitModified, BaseToolkit):
     def get_tools(self) -> list[BaseTool]:
         return self.available_tools
     
-    def get_db_hint(self, query: str) -> str | None:
+    async def get_db_hint(self, query: str) -> str | None:
         if not self.db_hints_doc_path:
             return None
         
@@ -66,7 +66,7 @@ class DbDataInteractionToolkit(SQLDatabaseToolkitModified, BaseToolkit):
         if not tool:
             return None
         
-        answer = tool.arun(query)
+        answer = await tool.arun(query)
         if any((phrase in answer) for phrase in DB_HINT_UNKNOWN_PHRASES):
             return None
         

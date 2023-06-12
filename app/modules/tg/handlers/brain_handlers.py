@@ -1,7 +1,5 @@
 import logging
 import json
-# comment: unused import
-import csv
 import datetime
 import uuid
 
@@ -85,14 +83,18 @@ def __get__ask_brain_handler__(
             )
 
         username = update.effective_user.username if update.effective_user else None
-        # comment: what's timezone?
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        current_time = datetime.datetime.now()
+        moscow_tz = datetime.timezone(datetime.timedelta(hours=3))
+        current_time_moscow = current_time.astimezone(moscow_tz)
+        timestamp = current_time_moscow.strftime("%Y-%m-%d %H:%M:%S")
 
-        # comment: handle errors
-        await internal_db.user_request_repository.add(
-            ray_id=ray_id, timestamp=timestamp, username=username, user_id=user_id
-        )
-
+        try:
+            await internal_db.user_request_repository.add(
+                ray_id=ray_id, timestamp=timestamp, username=username, user_id=user_id
+            )
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            
         logger.info(f"User {username}:{user_id} asked a question {question}")
 
         seconds = None
@@ -164,10 +166,12 @@ def __get__ask_brain_handler__(
             chat_id, message_text_for("continue_dialog"), parse_mode="HTML"
         )
 
-        # comment: do we need to handle errors here?
-        await internal_db.request_outcome_repository.add(
-            ray_id=ray_id, successful=True, error=None
-        )
+        try:
+            await internal_db.request_outcome_repository.add(
+                ray_id=ray_id, successful=True, error=None
+            )
+        except Exception as e:
+            logger.error(e, exc_info=True)
 
     return __ask_brain_handler__
 
@@ -176,43 +180,38 @@ async def show_sql_callback(
     update: Update, context: ContextTypes.DEFAULT_TYPE, internal_db: InternalDB
 ):
     query = update.callback_query
-    # comment: check if query is None
+    if not query:
+        await update.message.reply_text(message_text_for("not_found_script_error"))
     await query.answer()
     answer_without_sql = query.message.text
     callback_data = json.loads(query.data)
     ray_id = callback_data["ray_id"]
 
-    # comment: use async methods to get data from database
-    with internal_db.Session() as session:
-        brain_response_data = (
-            # comment: with new links between brain ersponse and user request, we need take the first brain response or smth else?
-            session.query(BrainResponseData).filter_by(ray_id=ray_id).first()
+    brain_response_data = await internal_db.brain_response_repository.get(ray_id = ray_id)
+    reply_markup = query.message.reply_markup
+    keyboard_without_sql = []
+    for button_row in reply_markup.inline_keyboard:
+        for button in button_row:
+            if not button.callback_data:
+                keyboard_without_sql.append(button)
+            elif (
+                json.loads(button.callback_data)["id"]
+                != ButtonId.ID_SQL_BUTTON.value
+            ):
+                keyboard_without_sql.append(button)
+    if brain_response_data and brain_response_data.sql_script:
+        answer_with_sql = message_text_for(
+            "answer_with_sql_script",
+            answer=answer_without_sql,
+            sql_script=brain_response_data.sql_script,
         )
-        reply_markup = query.message.reply_markup
-        keyboard_without_sql = []
-        for button_row in reply_markup.inline_keyboard:
-            for button in button_row:
-                if not button.callback_data:
-                    keyboard_without_sql.append(button)
-                elif (
-                    json.loads(button.callback_data)["id"]
-                    != ButtonId.ID_SQL_BUTTON.value
-                ):
-                    keyboard_without_sql.append(button)
-        if brain_response_data and brain_response_data.sql_script:
-            answer_with_sql = message_text_for(
-                "answer_with_sql_script",
-                answer=answer_without_sql,
-                sql_script=brain_response_data.sql_script,
-            )
-            await query.edit_message_text(text=answer_with_sql)
-        else:
-            # comment: here you clearing user's message, but you need to add the exception at the message's end.
-            await query.edit_message_text(
-                text=message_text_for("not_found_script_error")
-            )
-        new_reply_markup = InlineKeyboardMarkup([keyboard_without_sql])
-        if new_reply_markup != reply_markup:
-            await query.edit_message_reply_markup(
-                reply_markup=InlineKeyboardMarkup([keyboard_without_sql])
-            )
+        await query.edit_message_text(text=answer_with_sql)
+    else:
+        await query.edit_message_text(
+            text=query.message.text + message_text_for("not_found_script_error")
+        )
+    new_reply_markup = InlineKeyboardMarkup([keyboard_without_sql])
+    if new_reply_markup != reply_markup:
+        await query.edit_message_reply_markup(
+            reply_markup=InlineKeyboardMarkup([keyboard_without_sql])
+        )

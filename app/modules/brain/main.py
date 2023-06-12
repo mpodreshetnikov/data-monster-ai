@@ -38,9 +38,6 @@ from modules.common.sql_helpers import update_limit
 
 from modules.data_access.main import InternalDB
 
-# comment: unused imports
-from modules.data_access.models.brain_response_data import BrainResponseData
-
 
 logger = logging.getLogger(__name__)
 
@@ -98,9 +95,9 @@ class Brain:
         )
 
     async def answer(self, question: str, ray_id: str) -> Answer:
-        ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path)
+        ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path, ray_id=ray_id)
         answer = Answer(question, ray_id)
-        answer.answer_text = await self.__provide_text_answer(question, ray_logger)
+        answer.answer_text = await self.__provide_text_answer(question, ray_logger, ray_id)
         answer.sql_script = ray_logger.get_sql_script()
 
         try:
@@ -116,15 +113,18 @@ class Brain:
         return answer
 
     async def __save_brain_response(self, answer: Answer) -> None:
-        await self.internal_db.brain_response_repository.add(
-            answer.ray_id, answer.question, answer.sql_script, answer.answer_text
-        )
-
+        try:
+            await self.internal_db.brain_response_repository.add(
+                answer.ray_id, answer.question, answer.sql_script, answer.answer_text
+            )
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            
     async def __provide_text_answer(
-        self, question: str, ray_logger: LogLLMRayCallbackHandler
+        self, question: str, ray_logger: LogLLMRayCallbackHandler, ray_id:str
     ) -> str:
         last_prompt_saver = LastPromptSaverCallbackHandler()
-        sql_agent_chain = self.__build_sql_agent_chain(question, last_prompt_saver)
+        sql_agent_chain =  await self.__build_sql_agent_chain(question, last_prompt_saver)
         lang_translator_chain = self.__build_lang_translator_chain()
 
         overall_chain = SimpleSequentialChain(
@@ -144,15 +144,14 @@ class Brain:
                 )
             except OutputParserException as e:
                 logger.error("Parser cannot parse AI answer", exc_info=True)
-                # comment: do we need now to setup additional info (ray_id) to exception?
-                e = add_info_to_exception(e, "ray_id", ray_logger.get_ray_str())
+                e = add_info_to_exception(e, "ray_id", ray_id)
                 raise e
             except InvalidRequestError as e:
                 logger.error("Error while asking OpenAI", exc_info=True)
-                e = add_info_to_exception(e, "ray_id", ray_logger.get_ray_str())
+                e = add_info_to_exception(e, "ray_id", ray_id)
                 raise e
             except Exception as e:
-                e = add_info_to_exception(e, "ray_id", ray_logger.get_ray_str())
+                e = add_info_to_exception(e, "ray_id", ray_id)
                 raise e
             logger.info(openai_cb)
 
@@ -179,13 +178,13 @@ class Brain:
                 logger.info(f"Toolkit builded successfully\n{openai_cb}")
         return toolkit
 
-    def __build_sql_agent_chain(
+    async def __build_sql_agent_chain(
         self,
         question: str,
         last_prompt_saver: LastPromptSaverCallbackHandler,
         llm: BaseLanguageModel = None,
     ) -> Chain:
-        hints_str = get_formatted_hints(
+        hints_str = await get_formatted_hints(
             self._default_sql_llm_toolkit,
             question,
             self._sql_query_hints_limit,

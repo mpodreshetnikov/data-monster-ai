@@ -7,12 +7,9 @@ class UserRequest(Base):
     __tablename__ = "user_request"
 
     ray_id = Column(String, primary_key=True)
-    # comment: by default is Nullable. do we really need nullable here?
-    timestamp = Column(String)
-    # comment: by default is Nullable. do we really need nullable here?
-    username = Column(String)
-    # comment: by default is Nullable. do we really need nullable here?
-    user_id = Column(Integer)
+    timestamp = Column(String, nullable=False)
+    username = Column(String, nullable=False)
+    user_id = Column(Integer, nullable=False)
 
     brain_responses = relationship("BrainResponseData", back_populates="user_request")
     request_outcome = relationship(

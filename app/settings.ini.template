@@ -1,6 +1,5 @@
 [common]
 log_path = logs
-statistic = ./statistic.csv
 
 [debug]
 verbose = True
@@ -20,7 +19,6 @@ password = qwerty12345
 host = 1.1.1.1
 port = 1111
 database = dwh_uas
-schema = dwh_uas
 
 [client_db]
 sync_drivername = postgresql

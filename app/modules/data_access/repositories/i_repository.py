@@ -2,6 +2,7 @@ from typing import Optional
 from ..models.user_request import UserRequest
 
 # comment: !!! we already talk about it, remove all repositories, you have ORM !!!
+#TODO service
 class IRepository:
     async def add(
         self, ray_id: int, timestamp: str, username: str, user_id: int

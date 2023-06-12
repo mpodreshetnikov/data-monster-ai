@@ -57,11 +57,11 @@ def get_sql_suffix_with_hints(hints: str) -> str:
     return f"{hints}\n\n{SQL_SUFFIX}"
 
 
-def get_formatted_hints(
+async def get_formatted_hints(
         toolkit: DbDataInteractionToolkit, question: str, query_hints_limit: int = 1
 ):
     # Получаем подсказку для базы данных
-    db_hint = toolkit.get_db_hint(question)
+    db_hint = await toolkit.get_db_hint(question)
 
     # Получаем подсказки для запроса
     query_hints_list = toolkit.get_query_hints(question, query_hints_limit)

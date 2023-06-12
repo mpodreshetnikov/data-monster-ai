@@ -8,7 +8,7 @@ from langchain.base_language import BaseLanguageModel
 from mypy_boto3_s3 import S3Client
 from sqlalchemy import URL
 import boto3
-
+import uuid
 import modules.tg.main as tg
 from modules.brain.main import Brain
 from modules.data_access.main import InternalDB
@@ -24,7 +24,7 @@ def main():
     config.read(os.path.join(__location__, "settings.ini"))
 
     __configure_logger__(config)
-    internal_db = __configure_engine__(config)
+    internal_db = __configure_internal_db(config)
 
     brain = __configure_brain__(config)
     brain.internal_db = internal_db
@@ -41,8 +41,8 @@ def main():
 def __run_bot_in_console_and_block_thread__(brain: Brain):
     while True:
         question = str(input("Задай вопрос: "))
-        # comment: no parameter 'ray_id'
-        brain.answer(question)
+        ray_id = str(uuid.uuid4())
+        brain.answer(question, ray_id)
 
 
 def __run_bot_and_block_thread__(
@@ -104,8 +104,7 @@ def __configure_client_db__(config: ConfigParser) -> SQLDatabase:
     )
     schema = config.get("client_db", "schema")
     include_tables = config.get("client_db", "tables_to_use").split(",")
-    # comment: url and aurl is not str but method is awaiting str. Change method types to accept URL.
-    return MultischemaSQLDatabase.from_uri(
+    return MultischemaSQLDatabase.from_uri_async(
         url, aurl, schema=schema, include_tables=include_tables
     )
 
@@ -130,8 +129,7 @@ def __configure_logger__(config: ConfigParser, log_filename: str = "log.txt"):
         console_handler.setFormatter(log_formatter)
         root_logger.addHandler(console_handler)
 
-# comment: rename to configure_internal_db
-def __configure_engine__(config: ConfigParser) -> InternalDB:
+def __configure_internal_db(config: ConfigParser) -> InternalDB:
     url = URL.create(
         drivername=config.get("internal_db", "sync_drivername", fallback="postgresql"),
         username=config.get("internal_db", "username"),
@@ -141,8 +139,7 @@ def __configure_engine__(config: ConfigParser) -> InternalDB:
         database=config.get("internal_db", "database"),
     )
     aurl = URL.create(
-        # comment: fallback must be also async 
-        drivername=config.get("internal_db", "async_drivername", fallback="postgresql"),
+        drivername=config.get("internal_db", "async_drivername", fallback="postgresql+asyncpg"),
         username=config.get("internal_db", "username"),
         password=config.get("internal_db", "password"),
         host=config.get("internal_db", "host"),
