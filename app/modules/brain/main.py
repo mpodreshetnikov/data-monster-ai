@@ -162,19 +162,22 @@ class Brain:
         if sql:
             data = None
             try:
-                with self.db._engine.connect() as connection:
-                    data = connection.execute(text(sql)).mappings().all()
+                async with self.db._async_engine.connect() as connection:
+                    result = await connection.execute(text(sql))
+                    rows = result.fetchall()
+                    columns = result.keys()
+                    data: list[dict] = [dict(zip(columns, row)) for row in rows]
             except OperationalError:
                 if ray_logger.was_sql_timeout_error:
                     e = SQLTimeoutAnswerException()
                     e = add_info_to_exception(
-                        e, "ray_id", ray_logger.get_ray_str())
+                        e, "ray_id", ray_id)
                     raise e
             except Exception as e:
-                logger.error(f"Error while executing SQL, ray_id: {ray_logger.get_ray_str()}", exc_info=True)
+                logger.error(f"Error while executing SQL, ray_id: {ray_id}", exc_info=True)
                 e = CreatedNotWorkingSQLAnswerException()
                 e = add_info_to_exception(
-                    e, "ray_id", ray_logger.get_ray_str())
+                    e, "ray_id", ray_id)
                 raise e
             if not data or (
                 # test if data contains only one row with one value and it is False (0, no data, empty string)
@@ -182,7 +185,7 @@ class Brain:
             ):
                 e = NoDataReturnedFromDBAnswerException()
                 e = add_info_to_exception(
-                    e, "ray_id", ray_logger.get_ray_str())
+                    e, "ray_id", ray_id)
                 raise e
 
         return response

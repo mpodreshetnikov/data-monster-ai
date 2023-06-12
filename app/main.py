@@ -96,7 +96,7 @@ def __configure_client_db__(config: ConfigParser) -> SQLDatabase:
         database=config.get("client_db", "database"),
     )
     aurl = URL.create(
-        drivername=config.get("client_db", "async_drivername", fallback="postgresql"),
+        drivername=config.get("client_db", "async_drivername", fallback="postgresql+asyncpg"),
         username=config.get("client_db", "username"),
         password=config.get("client_db", "password"),
         host=config.get("client_db", "host"),
@@ -105,14 +105,10 @@ def __configure_client_db__(config: ConfigParser) -> SQLDatabase:
     )
     schema = config.get("client_db", "schema")
     include_tables = config.get("client_db", "tables_to_use").split(",")
-<<<<<<< HEAD
-    connect_args =  json.loads(config.get("client_db", "connect_args"))
-    return MultischemaSQLDatabase.from_uri(url, engine_args= {"connect_args": connect_args}, schema=schema, include_tables=include_tables)
-=======
+
     return MultischemaSQLDatabase.from_uri_async(
-        url, aurl, schema=schema, include_tables=include_tables
+        url=url, aurl=aurl, schema=schema, include_tables=include_tables
     )
->>>>>>> statistics-tracking
 
 
 def __configure_logger__(config: ConfigParser, log_filename: str = "log.txt"):
@@ -128,13 +124,8 @@ def __configure_logger__(config: ConfigParser, log_filename: str = "log.txt"):
     file_handler.setFormatter(log_formatter)
     root_logger.addHandler(file_handler)
 
-<<<<<<< HEAD
     verbose = config.getboolean("debug", "verbose", fallback=False)
     if verbose:
-=======
-    # verbose is not used anywhere
-    if verbose := config.getboolean("debug", "verbose", fallback=False):
->>>>>>> statistics-tracking
         root_logger.setLevel(logging.INFO)
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(log_formatter)

@@ -180,8 +180,6 @@ async def show_sql_callback(
     update: Update, context: ContextTypes.DEFAULT_TYPE, internal_db: InternalDB
 ):
     query = update.callback_query
-    if not query:
-        await update.message.reply_text(message_text_for("not_found_script_error"))
     await query.answer()
     answer_without_sql = query.message.text
     callback_data = json.loads(query.data)
@@ -199,19 +197,17 @@ async def show_sql_callback(
                 != ButtonId.ID_SQL_BUTTON.value
             ):
                 keyboard_without_sql.append(button)
+    new_reply_markup = InlineKeyboardMarkup([keyboard_without_sql])           
+    if new_reply_markup != reply_markup:
+        reply_markup = new_reply_markup
     if brain_response_data and brain_response_data.sql_script:
         answer_with_sql = message_text_for(
             "answer_with_sql_script",
             answer=answer_without_sql,
             sql_script=brain_response_data.sql_script,
         )
-        await query.edit_message_text(text=answer_with_sql)
+        await query.edit_message_text(text=answer_with_sql, reply_markup = reply_markup)
     else:
         await query.edit_message_text(
-            text=query.message.text + message_text_for("not_found_script_error")
-        )
-    new_reply_markup = InlineKeyboardMarkup([keyboard_without_sql])
-    if new_reply_markup != reply_markup:
-        await query.edit_message_reply_markup(
-            reply_markup=InlineKeyboardMarkup([keyboard_without_sql])
+            text=query.message.text + message_text_for("not_found_script_error"),reply_markup = reply_markup
         )

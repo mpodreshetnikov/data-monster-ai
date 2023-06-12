@@ -9,7 +9,6 @@ from modules.common.errors import (
     get_info_from_exception, AgentLimitExceededAnswerException,
     SQLTimeoutAnswerException, CreatedNotWorkingSQLAnswerException,
     NoDataReturnedFromDBAnswerException, LLMContextExceededAnswerException)
-from ..utils.statistics_writer import StatisticWriter 
 
 from modules.data_access.main import InternalDB
 
@@ -87,9 +86,8 @@ async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         error_message += ray_id_text
 
     try:
-        if ray_id:
-            await update.message.reply_text(message_text_for("unknown_error_with_ray_id", ray_id=ray_id), parse_mode="HTML")
-        else:
-            await update.message.reply_text(message_text_for("unknown_error"), parse_mode="HTML")
+        await effective_message.reply_text(
+            error_message,
+            parse_mode="HTML")
     except Exception as e:
         logger.error(e, exc_info=True)
