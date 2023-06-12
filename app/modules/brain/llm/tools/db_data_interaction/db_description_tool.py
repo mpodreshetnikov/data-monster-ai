@@ -75,34 +75,9 @@ class ListSQLDatabaseWithCommentsTool(ListSQLDatabaseTool):
     async def _arun(  # TODO change async
         self,
         tool_input: str = "",
-        run_manager: Optional[CallbackManagerForToolRun] = None,
+        run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
     ) -> str:
-        """Get the schema for a specific table."""
-        if self.db._include_tables:
-            tables_to_take = self.db._include_tables
-        else:
-            tables_to_take = self.db._all_tables - self.db._ignore_tables
-
-        # return cached data if possible
-        cache_key = str.join(",", tables_to_take)
-        if cache_key == self.cache_key:
-            return self.cache
-
-        table_strings = []
-        for table in tables_to_take:
-            # db_comment = self.db._inspector.get_table_comment(table, schema=self.db._schema)["text"] TODO: Временно решили не учитывать комменты из БД
-            override_comment = self.__get_override_table_comment(table)
-            comment = override_comment  # if override_comment else db_comment
-            if comment:
-                table_strings.append(f"{table} ({comment})")
-            else:
-                table_strings.append(table)
-
-        value = ", ".join(table_strings)
-        self.cache_key = cache_key
-        self.cache = value
-
-        return value
+        self.run(tool_input,run_manager)
 
 
 class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
@@ -131,19 +106,13 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
             """Format the error message"""
             return f"Error: {e}"
 
-    async def _arun(  # TODO change
+    async def _arun(
         self,
         table_name: str,
+        tool_input: str = "",
         run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
     ) -> str:
-        table_name = self.__get_table_name(table_name)
-        table_names = [table_name]
-
-        try:
-            return self.__get_table_info(table_names)
-        except ValueError as e:
-            """Format the error message"""
-            return f"Error: {e}"
+        self._run(table_name, tool_input, run_manager)
 
     ### Method was taken from InfoSQLDatabaseTool and modified to include column comments ###
     def __get_table_info(self, table_names):
@@ -239,19 +208,19 @@ class LightweightQuerySQLDataBaseTool(QuerySQLDataBaseTool):
         tool_input: str = "",
         run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> str:
-        result: str = super()._run(query, run_manager)
+        result: str = self.db.run_no_throw(query)
         if "Error:" in result:
             simplified_error_text = result.split("[SQL:")[0].rstrip()
             return simplified_error_text
         return result
 
-    async def _arun(  # TODO change super()._run(query, run_manager) to arun_no_throw when an asyn db connection is created
+    async def _arun(
         self,
         query: str,
         tool_input: str = "",
         run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> str:
-        result: str = super()._run(query, run_manager)
+        result: str = await self.db.arun_no_throw(query)
         if "Error:" in result:
             simplified_error_text = result.split("[SQL:")[0].rstrip()
             return simplified_error_text

@@ -1,6 +1,5 @@
 [common]
 log_path = logs
-statistic = ./statistic.csv
 
 [debug]
 verbose = True
@@ -13,11 +12,17 @@ whitelist = tg_login,tg_login,tg_user_id
 web_app_storage_base_link = https://mpodreshetnikov.ru/gpt_bi_bot/tg_web_app_pages
 
 [internal_db]
-drivername = sqlite
-database = name.sqlite
+sync_drivername = postgresql
+async_drivername = postgresql+asyncpg
+username = db_user
+password = qwerty12345
+host = 1.1.1.1
+port = 1111
+database = dwh_uas
 
 [client_db]
-drivername = postgresql
+sync_drivername = postgresql
+async_drivername = postgresql+asyncpg
 username = db_user
 password = qwerty12345
 host = 1.1.1.1

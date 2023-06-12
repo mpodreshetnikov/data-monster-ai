@@ -11,28 +11,34 @@ from modules.common.errors import (
     NoDataReturnedFromDBAnswerException, LLMContextExceededAnswerException)
 from ..utils.statistics_writer import StatisticWriter 
 
+from modules.data_access.main import InternalDB
+
 logger = logging.getLogger(__name__)
 
 
-def add_handlers(application: Application, statistic):
-    application.add_error_handler(lambda update, context: __error_handler__(update, context, statistic),)
-    
+def add_handlers(application: Application, internal_db: InternalDB):
+    application.add_error_handler(
+        lambda update, context: __error_handler__(update, context, internal_db),
+    )
 
-async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE, statistic: str):
+
+async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE, internal_db: InternalDB):
     error = context.error
 
     username = update.effective_user.username if update.effective_user else None
     user_id = update.effective_user.id if update.effective_user else None
+    ray_id = context.user_data["ray_id"]
     chat_id = update.effective_chat.id if update.effective_chat else None
+
+    try:
+        await internal_db.request_outcome_repository.add(
+            ray_id=ray_id, successful=False, error=error
+        )
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
     effective_message = update.effective_message
     message_id = effective_message.message_id if effective_message else None
-
-    # try:
-    #     StatisticWriter.false_successful(
-    #         statistic, str(chat_id), str(message_id), str(error or "unknown error"))
-    # except Exception:
-    #     pass
 
     if not effective_message:
         logger.error("Error occured but no effective message found.")
@@ -81,10 +87,9 @@ async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         error_message += ray_id_text
 
     try:
-        await effective_message.reply_text(
-            error_message,
-            parse_mode="HTML")
+        if ray_id:
+            await update.message.reply_text(message_text_for("unknown_error_with_ray_id", ray_id=ray_id), parse_mode="HTML")
+        else:
+            await update.message.reply_text(message_text_for("unknown_error"), parse_mode="HTML")
     except Exception as e:
         logger.error(e, exc_info=True)
-
-    

@@ -5,13 +5,13 @@ from langchain.agents.agent_toolkits.base import BaseToolkit
 from langchain.base_language import BaseLanguageModel
 from langchain.tools import BaseTool
 from langchain.embeddings.base import Embeddings
-from langchain.tools.vectorstore.tool import VectorStoreQATool
 from langchain.tools.human import HumanInputRun
 
 from modules.brain.llm.tools.db_data_interaction.db_hints_tool import get_db_hints_tools
 from modules.brain.llm.tools.db_data_interaction.db_description_tool import SQLDatabaseToolkitModified, InfoSQLDatabaseWithCommentsTool
 from modules.brain.llm.tools.db_data_interaction.query_hints_tool import SQLQueryHintsToolkit, SQLQueryHint
 
+from modules.brain.llm.tools.vectorstore.vector_store_qa_tool import VectorStoreQATool
 
 DB_HINT_UNKNOWN_PHRASES = [
     "не знаю", "не могу", "не владею",
@@ -58,7 +58,7 @@ class DbDataInteractionToolkit(SQLDatabaseToolkitModified):
     def get_tools(self) -> list[BaseTool]:
         return self.available_tools
     
-    def get_db_hint(self, query: str) -> str | None:
+    async def get_db_hint(self, query: str) -> str | None:
         if not self.db_hints_doc_path:
             return None
         
@@ -66,7 +66,7 @@ class DbDataInteractionToolkit(SQLDatabaseToolkitModified):
         if not tool:
             return None
         
-        answer = tool.run(query)
+        answer = await tool.arun(query)
         if any((phrase in answer) for phrase in DB_HINT_UNKNOWN_PHRASES):
             return None
         
