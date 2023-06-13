@@ -11,7 +11,7 @@ from modules.brain.llm.tools.db_data_interaction.db_hints_tool import get_db_hin
 from modules.brain.llm.tools.db_data_interaction.db_description_tool import SQLDatabaseToolkitModified, InfoSQLDatabaseWithCommentsTool
 from modules.brain.llm.tools.db_data_interaction.query_hints_tool import SQLQueryHintsToolkit, SQLQueryHint
 
-from modules.brain.llm.tools.vectorstore.vector_store_qa_tool import VectorStoreQATool
+from modules.brain.llm.tools.vectorstore_new.vector_store_qa_tool import VectorStoreQATool
 
 DB_HINT_UNKNOWN_PHRASES = [
     "не знаю", "не могу", "не владею",
