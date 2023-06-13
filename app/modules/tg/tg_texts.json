@@ -7,8 +7,13 @@
     "answer_show_sql_button": "SQL-код",
     "answer_with_sql_script": "{answer}\n\nSQL:\n{sql_script}",
     "continue_dialog": "Что еще хочешь узнать?",
+    "ray_id_ext": "\n\n<i>ID запроса: {ray_id}</i>",
     "user_not_allowed": "Доступ к боту отсутствует.",
-    "unknown_error": "При обработке запроса произошла ошибка. Попробуйте изменить запрос.",
-    "not_found_script_error":"\nПроизошла ошибка и sql-запрос к сожалению утерян",
-    "unknown_error_with_ray_id": "При обработке запроса произошла ошибка. Попробуйте изменить запрос.\n<i>ray_id: {ray_id}</i>"
+    "not_found_script_error":"\n\nSQL-код запроса утерян.",
+    "unknown_error": "При обработке запроса произошла ошибка. Попробуй изменить запрос.",
+    "error_AgentLimitExceededAnswerException": "Я не смог найти ответ на вопрос. Попробуй упростить вопрос или задать его по-другому.",
+    "error_SQLTimeoutAnswerException": "SQL-код, который я сформировал, выполняется слишком долго. Попробуй задать другой вопрос.",
+    "error_CreatedNotWorkingSQLAnswerException": "Мне не удалось сформировать корректный SQL-код. Попробуй уточнить детали вопроса и написать его более простым языком.",
+    "error_NoDataReturnedFromDBAnswerException": "SQL-код, который я сформировал, возвращает пустой результат. Попробуй изменить вопрос.",
+    "error_LLMContextExceededAnswerException": "Я запутался в попытках найти ответ на вопрос. Попробуй уточнить детали вопроса и написать его более простым языком."
 }

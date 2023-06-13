@@ -1,54 +1,93 @@
 import logging
-from httpx import LocalProtocolError
 
 from telegram.ext import Application, ContextTypes
 from telegram import Update
 
 from modules.tg.utils.exceptions import UserNotAllowedException
 from modules.tg.utils.texts import message_text_for
-from modules.common.errors import get_info_from_exception
-from ..utils.statistics_writer import StatisticWriter 
+from modules.common.errors import (
+    get_info_from_exception, AgentLimitExceededAnswerException,
+    SQLTimeoutAnswerException, CreatedNotWorkingSQLAnswerException,
+    NoDataReturnedFromDBAnswerException, LLMContextExceededAnswerException)
+
+from modules.data_access.main import InternalDB
 
 logger = logging.getLogger(__name__)
 
 
-def add_handlers(application: Application, statistic):
-    application.add_error_handler(lambda update, context: __error_handler__(update, context, statistic),)
-    
+def add_handlers(application: Application, internal_db: InternalDB):
+    application.add_error_handler(
+        lambda update, context: __error_handler__(update, context, internal_db),
+    )
 
-async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE, statistic:str):
+
+async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE, internal_db: InternalDB):
     error = context.error
-    ray_id = get_info_from_exception(error, "ray_id")
+
+    username = update.effective_user.username if update.effective_user else None
     user_id = update.effective_user.id if update.effective_user else None
-    message_id = update.message.message_id if update.effective_message else None
+    ray_id = context.user_data["ray_id"]
     chat_id = update.effective_chat.id if update.effective_chat else None
 
-    if chat_id and message_id:
-            StatisticWriter.false_successful(statistic, chat_id, message_id, error)
-        
-    if (isinstance(error, LocalProtocolError)):
-        logger.error(error, exc_info=True)
+    try:
+        await internal_db.request_outcome_repository.add(
+            ray_id=ray_id, successful=False, error=error
+        )
+    except Exception as e:
+        logger.error(e, exc_info=True)
+
+    effective_message = update.effective_message
+    message_id = effective_message.message_id if effective_message else None
+
+    if not effective_message:
+        logger.error("Error occured but no effective message found.")
+        if error:
+            logger.error(error, exc_info=True)
+        else:
+            logger.error("An unknown error occurred.")
         return
 
+    if not error:
+        logger.error("An unknown error occurred.")
+        await effective_message.reply_text(message_text_for("unknown_error"), parse_mode="HTML")
+        return
+
+    logger.error(error, exc_info=True)
+
+    ray_id = get_info_from_exception(error, "ray_id")
+
     if isinstance(error, UserNotAllowedException):
-        username = update.effective_user.username
-        user_id = update.effective_user.id
         method_name = error.method_name or "app"
         logger.info(f"User {username}:{user_id} was not allowed to the {method_name}")
         try:
-            await update.message.reply_text(message_text_for("user_not_allowed"), parse_mode="HTML")
+            await effective_message.reply_text(message_text_for("user_not_allowed"), parse_mode="HTML")
         except Exception as e:
             logger.error(e, exc_info=True)
         return
-    
-    logger.error(error, exc_info=True)
+
+    error_message = ""
+
+    if isinstance(error, AgentLimitExceededAnswerException):
+        error_message = message_text_for("error_AgentLimitExceededAnswerException")
+    if isinstance(error, SQLTimeoutAnswerException):
+        error_message = message_text_for("error_SQLTimeoutAnswerException")
+    if isinstance(error, CreatedNotWorkingSQLAnswerException):
+        error_message = message_text_for("error_CreatedNotWorkingSQLAnswerException")
+    if isinstance(error, NoDataReturnedFromDBAnswerException):
+        error_message = message_text_for("error_NoDataReturnedFromDBAnswerException")
+    if isinstance(error, LLMContextExceededAnswerException):
+        error_message = message_text_for("error_LLMContextExceededAnswerException")
+
+    if not error_message:
+        error_message = message_text_for("unknown_error")
+
+    if ray_id:
+        ray_id_text = message_text_for("ray_id_ext", ray_id=ray_id)
+        error_message += ray_id_text
+
     try:
-        if ray_id:
-            await update.message.reply_text(message_text_for("unknown_error_with_ray_id", ray_id=ray_id), parse_mode="HTML")
-        else:
-            await update.message.reply_text(message_text_for("unknown_error"), parse_mode="HTML")
+        await effective_message.reply_text(
+            error_message,
+            parse_mode="HTML")
     except Exception as e:
         logger.error(e, exc_info=True)
-        
-
-    

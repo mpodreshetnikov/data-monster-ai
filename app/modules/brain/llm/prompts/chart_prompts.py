@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 import re
 from langchain import PromptTemplate
-from langchain.schema import BaseOutputParser, OutputParserException
+from langchain.schema import BaseOutputParser
 
 
 GET_CHART_PARAMS = """You are a helpful assistant that provide user's requests to the app.
