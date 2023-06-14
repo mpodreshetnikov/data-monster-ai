@@ -6,6 +6,9 @@ verbose = True
 run_in_console = False
 prompt_log_path = logs/prompt_log.txt
 
+[timeout]
+seconds = 60
+
 [tg]
 bot_token = 12345678:AAAAAAAAAAAAAAAAAAA
 whitelist = tg_login,tg_login,tg_user_id
