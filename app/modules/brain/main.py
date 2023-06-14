@@ -162,7 +162,7 @@ class Brain:
         if sql:
             data = None
             try:
-                async with self.db._async_engine.connect() as connection:
+                async with self.db._async_engine.begin() as connection:
                     result = await connection.execute(text(sql))
                     rows = result.fetchall()
                     columns = result.keys()
