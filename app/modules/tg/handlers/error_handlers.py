@@ -29,12 +29,6 @@ async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     ray_id = context.user_data["ray_id"]
     chat_id = update.effective_chat.id if update.effective_chat else None
 
-    try:
-        await internal_db.request_outcome_repository.add(
-            ray_id=ray_id, successful=False, error=error
-        )
-    except Exception as e:
-        logger.error(e, exc_info=True)
 
     effective_message = update.effective_message
     message_id = effective_message.message_id if effective_message else None
@@ -84,6 +78,15 @@ async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     if ray_id:
         ray_id_text = message_text_for("ray_id_ext", ray_id=ray_id)
         error_message += ray_id_text
+
+    try:
+        await internal_db.request_outcome_repository.add(
+            ray_id=ray_id,
+            successful=False,
+            error=f"{type(error).__name__}: {error_message}",
+        )
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
     try:
         await effective_message.reply_text(
