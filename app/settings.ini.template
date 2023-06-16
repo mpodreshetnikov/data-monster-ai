@@ -6,9 +6,6 @@ verbose = True
 run_in_console = False
 prompt_log_path = logs/prompt_log.txt
 
-[timeout]
-seconds = 60
-
 [tg]
 bot_token = 12345678:AAAAAAAAAAAAAAAAAAA
 whitelist = tg_login,tg_login,tg_user_id
@@ -22,6 +19,7 @@ password = qwerty12345
 host = 1.1.1.1
 port = 1111
 database = dwh_uas
+timeout = 60
 
 [client_db]
 sync_drivername = postgresql
@@ -33,6 +31,7 @@ port = 1111
 database = dwh_uas
 schema = dwh_uas
 tables_to_use = shema1.table1,shema1.table2,shema2.table3,shema2.table4,shema3.table5
+timeout = 60
 
 [s3]
 endpoint_url = https://mpodreshetnikov.ru/s3
