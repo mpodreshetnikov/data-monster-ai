@@ -6,11 +6,17 @@ from telegram import Update
 from modules.tg.utils.exceptions import UserNotAllowedException
 from modules.tg.utils.texts import message_text_for
 from modules.common.errors import (
-    get_info_from_exception, AgentLimitExceededAnswerException,
-    SQLTimeoutAnswerException, CreatedNotWorkingSQLAnswerException,
-    NoDataReturnedFromDBAnswerException, LLMContextExceededAnswerException)
+    get_info_from_exception,
+    AgentLimitExceededAnswerException,
+    SQLTimeoutAnswerException,
+    CreatedNotWorkingSQLAnswerException,
+    NoDataReturnedFromDBAnswerException,
+    LLMContextExceededAnswerException,
+)
 
 from modules.data_access.main import InternalDB
+
+from modules.data_access.models.request_outcome import RequestOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +27,15 @@ def add_handlers(application: Application, internal_db: InternalDB):
     )
 
 
-async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE, internal_db: InternalDB):
+async def __error_handler__(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, internal_db: InternalDB
+):
     error = context.error
 
     username = update.effective_user.username if update.effective_user else None
     user_id = update.effective_user.id if update.effective_user else None
     ray_id = context.user_data["ray_id"]
     chat_id = update.effective_chat.id if update.effective_chat else None
-
 
     effective_message = update.effective_message
     message_id = effective_message.message_id if effective_message else None
@@ -43,7 +50,9 @@ async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
     if not error:
         logger.error("An unknown error occurred.")
-        await effective_message.reply_text(message_text_for("unknown_error"), parse_mode="HTML")
+        await effective_message.reply_text(
+            message_text_for("unknown_error"), parse_mode="HTML"
+        )
         return
 
     logger.error(error, exc_info=True)
@@ -54,7 +63,9 @@ async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         method_name = error.method_name or "app"
         logger.info(f"User {username}:{user_id} was not allowed to the {method_name}")
         try:
-            await effective_message.reply_text(message_text_for("user_not_allowed"), parse_mode="HTML")
+            await effective_message.reply_text(
+                message_text_for("user_not_allowed"), parse_mode="HTML"
+            )
         except Exception as e:
             logger.error(e, exc_info=True)
         return
@@ -80,17 +91,16 @@ async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         error_message += ray_id_text
 
     try:
-        await internal_db.request_outcome_repository.add(
+        request_outcome = RequestOutcome(
             ray_id=ray_id,
             successful=False,
             error=f"{type(error).__name__}: {error_message}",
         )
+        await internal_db.request_outcome_repository.add(request_outcome)
     except Exception as e:
         logger.error(e, exc_info=True)
 
     try:
-        await effective_message.reply_text(
-            error_message,
-            parse_mode="HTML")
+        await effective_message.reply_text(error_message, parse_mode="HTML")
     except Exception as e:
         logger.error(e, exc_info=True)

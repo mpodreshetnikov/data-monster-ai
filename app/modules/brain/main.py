@@ -44,7 +44,7 @@ from modules.common.errors import (
 from modules.common.sql_helpers import update_limit
 
 from modules.data_access.main import InternalDB
-
+from modules.data_access.models.brain_response_data import BrainResponseData
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +102,9 @@ class Brain:
         )
 
     async def answer(self, question: str, ray_id: str) -> Answer:
+        brain_response = BrainResponseData(question = question, user_request_ray_id = ray_id)
+        brain_response = await self.__create_brain_response(brain_response)
+        
         ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path, ray_id=ray_id)
         answer = Answer(question, ray_id)
         answer.answer_text = await self.__provide_text_answer(question, ray_logger, ray_id)
@@ -116,13 +119,20 @@ class Brain:
         except Exception:
             answer.chart_params = None
 
-        await self.__save_brain_response(answer)
+        await self.__save_brain_response(brain_response, answer)
         return answer
 
-    async def __save_brain_response(self, answer: Answer) -> None:
+    async def __create_brain_response(self, brain_response: BrainResponseData) -> None:
         try:
-            await self.internal_db.brain_response_repository.add(
-                answer.ray_id, answer.question, answer.sql_script, answer.answer_text
+            return await self.internal_db.brain_response_repository.add(brain_response)
+        except Exception as e:
+            logger.error(e, exc_info=True)
+    
+    async def __save_brain_response(self, brain_response: BrainResponseData, answer: Answer) -> None:
+        try:
+            new_data = {"sql_script": answer.sql_script, "answer": answer.answer_text}
+            await self.internal_db.brain_response_repository.update(
+                id = brain_response.id, new_data=new_data
             )
         except Exception as e:
             logger.error(e, exc_info=True)

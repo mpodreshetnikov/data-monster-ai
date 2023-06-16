@@ -13,14 +13,8 @@ class UserRequestRepository(IRepository):
         self.async_session = async_session
         self.timeout_seconds = timeout_seconds
 
-    async def add(self, ray_id, timestamp, username, user_id):
+    async def add(self, user_request):
         async with self.async_session() as session:
-            user_request = UserRequest(
-                ray_id=ray_id,
-                timestamp=timestamp,
-                username=username,
-                user_id=user_id,
-            )
             session.add(user_request)
             await execute_with_timeout(session.commit(), self.timeout_seconds)
 

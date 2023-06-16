@@ -13,20 +13,16 @@ class BrainResponseRepository(IRepository):
         self.async_session = async_session
         self.timeout_seconds = timeout_seconds
 
-    async def add(self, ray_id, question, sql_script, answer):
+    async def add(self, brain_response_data):
         async with self.async_session() as session:
-            brain_response_data = BrainResponseData(
-                user_request_ray_id=ray_id,
-                question=question,
-                sql_script=sql_script,
-                answer=answer,
-            )
             session.add(brain_response_data)
             await execute_with_timeout(session.commit(), self.timeout_seconds)
+            await session.refresh(brain_response_data)
+            return brain_response_data
 
     async def update(self, id, new_data):
         async with self.async_session() as session:
-            result = execute_with_timeout(
+            result = await execute_with_timeout(
                 session.execute(
                     select(BrainResponseData)
                     .where(BrainResponseData.id == id)

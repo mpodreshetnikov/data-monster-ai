@@ -20,7 +20,8 @@ from modules.tg.utils.time_watching import ExecInfoStorage
 
 from modules.brain.main import Brain
 from modules.data_access.main import InternalDB
-from modules.data_access.models.brain_response_data import BrainResponseData
+from modules.data_access.models.user_request import UserRequest
+from modules.data_access.models.request_outcome import RequestOutcome
 from ..web_app.main import WebApp, WebAppTypes
 from ..utils.button_id import ButtonId
 
@@ -65,7 +66,9 @@ def __get__ask_brain_handler__(
     async def __ask_brain_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id if update.effective_chat else None
         user_id = update.effective_user.id if update.effective_user else None
-        message_id = update.effective_message.message_id if update.effective_message else None
+        message_id = (
+            update.effective_message.message_id if update.effective_message else None
+        )
         question = (
             " ".join(context.args)
             if context.args
@@ -89,12 +92,13 @@ def __get__ask_brain_handler__(
         timestamp = current_time_moscow.strftime("%Y-%m-%d %H:%M:%S")
 
         try:
-            await internal_db.user_request_repository.add(
+            user_request = UserRequest(
                 ray_id=ray_id, timestamp=timestamp, username=username, user_id=user_id
             )
+            await internal_db.user_request_repository.add(user_request)
         except Exception as e:
             logger.error(e, exc_info=True)
-            
+
         logger.info(f"User {username}:{user_id} asked a question {question}")
 
         seconds = None
@@ -167,9 +171,8 @@ def __get__ask_brain_handler__(
         )
 
         try:
-            await internal_db.request_outcome_repository.add(
-                ray_id=ray_id, successful=True, error=None
-            )
+            request_outcome = RequestOutcome(ray_id=ray_id, successful=True, error=None)
+            await internal_db.request_outcome_repository.add(request_outcome)
         except Exception as e:
             logger.error(e, exc_info=True)
 
@@ -185,19 +188,16 @@ async def show_sql_callback(
     callback_data = json.loads(query.data)
     ray_id = callback_data["ray_id"]
 
-    brain_response_data = await internal_db.brain_response_repository.get(ray_id = ray_id)
+    brain_response_data = await internal_db.brain_response_repository.get(ray_id=ray_id)
     reply_markup = query.message.reply_markup
     keyboard_without_sql = []
     for button_row in reply_markup.inline_keyboard:
         for button in button_row:
             if not button.callback_data:
                 keyboard_without_sql.append(button)
-            elif (
-                json.loads(button.callback_data)["id"]
-                != ButtonId.ID_SQL_BUTTON.value
-            ):
+            elif json.loads(button.callback_data)["id"] != ButtonId.ID_SQL_BUTTON.value:
                 keyboard_without_sql.append(button)
-    new_reply_markup = InlineKeyboardMarkup([keyboard_without_sql])           
+    new_reply_markup = InlineKeyboardMarkup([keyboard_without_sql])
     if new_reply_markup != reply_markup:
         reply_markup = new_reply_markup
     if brain_response_data and brain_response_data.sql_script:
@@ -206,8 +206,9 @@ async def show_sql_callback(
             answer=answer_without_sql,
             sql_script=brain_response_data.sql_script,
         )
-        await query.edit_message_text(text=answer_with_sql, reply_markup = reply_markup)
+        await query.edit_message_text(text=answer_with_sql, reply_markup=reply_markup)
     else:
         await query.edit_message_text(
-            text=query.message.text + message_text_for("not_found_script_error"),reply_markup = reply_markup
+            text=query.message.text + message_text_for("not_found_script_error"),
+            reply_markup=reply_markup,
         )

@@ -11,11 +11,8 @@ class RequestOutcomeRepository(IRepository):
         self.async_session = async_session
         self.timeout_seconds = timeout_seconds
 
-    async def add(self, ray_id, successful, error):
+    async def add(self, request_outcome):
         async with self.async_session() as session:
-            request_outcome = RequestOutcome(
-                ray_id=ray_id, successful=successful, error=error
-            )
             session.add(request_outcome)
             await execute_with_timeout(session.commit(), self.timeout_seconds)
 
