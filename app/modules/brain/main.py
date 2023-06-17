@@ -68,7 +68,6 @@ class Brain:
     _verbose: bool = False
     _default_sql_llm_toolkit: DbDataInteractionToolkit
     _sql_query_hints_limit: int = 0
-    _sql_agent_max_iterations: int = 5
 
     def __init__(
         self,
@@ -79,7 +78,6 @@ class Brain:
         db_comments_override_path: str | None = None,
         sql_query_examples_path: str | None = None,
         sql_query_hints_limit: int = 0,
-        sql_agent_max_iterations: int = 5,
         verbose: bool = False,
         prompt_log_path: str | None = None,
         internal_db: InternalDB | None = None,
@@ -87,7 +85,6 @@ class Brain:
         self.db = db
         self._verbose = verbose
         self._sql_query_hints_limit = sql_query_hints_limit
-        self._sql_agent_max_iterations = sql_agent_max_iterations
         self._prompt_log_path = prompt_log_path
         self.internal_db = internal_db
         if not embeddings:
@@ -215,7 +212,7 @@ class Brain:
         self,
         question: str,
         last_prompt_saver: LastPromptSaverCallbackHandler,
-        llm: BaseLanguageModel = None,
+        llm: BaseLanguageModel | None = None,
     ) -> Chain:
         hints_str = await get_formatted_hints(
             self._default_sql_llm_toolkit,
@@ -287,13 +284,13 @@ class Brain:
             tools=tools,
             callback_manager=callback_manager,
             verbose=self._verbose,
-            max_iterations=self._sql_agent_max_iterations,
+            max_iterations=2,
             max_execution_time=max_execution_time,
             early_stopping_method=early_stopping_method,
             **(agent_executor_kwargs or {}),
         )
 
-    def __build_lang_translator_chain(self, llm: BaseLanguageModel = None) -> Chain:
+    def __build_lang_translator_chain(self, llm: BaseLanguageModel | None = None) -> Chain:
         translator_chain = LLMChain(
             llm=llm or self.default_llm, prompt=TRANSLATOR_PROMPT
         )
