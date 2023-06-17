@@ -58,6 +58,8 @@ def __get__ask_brain_handler__(
         logger.warning("No web_app_base_url provided, chart page will not be available")
     if not s3client:
         logger.warning("No s3client provided, chart page will not be available")
+    if not internal_db:
+        raise ValueError("No internal_db provided")
 
     exec_info_storage = ExecInfoStorage(count=10)
 
@@ -83,14 +85,10 @@ def __get__ask_brain_handler__(
             )
 
         username = update.effective_user.username if update.effective_user else None
-        current_time = datetime.datetime.now()
-        moscow_tz = datetime.timezone(datetime.timedelta(hours=3))
-        current_time_moscow = current_time.astimezone(moscow_tz)
-        timestamp = current_time_moscow.strftime("%Y-%m-%d %H:%M:%S")
 
         try:
             await internal_db.user_request_repository.add(
-                ray_id=ray_id, timestamp=timestamp, username=username, user_id=user_id
+                ray_id=ray_id, username=username or "", user_id=user_id
             )
         except Exception as e:
             logger.error(e, exc_info=True)

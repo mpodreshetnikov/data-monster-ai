@@ -13,12 +13,11 @@ class LogLLMRayCallbackHandler(BaseCallbackHandler):
     sql_script: str | None = None
     was_sql_timeout_error: bool = False
 
-    def __init__(self, log_path: str, ray_id:str) -> None:
+    def __init__(self, log_path: str | None, ray_id:str) -> None:
         self.log_path = log_path
         self.ray_id = ray_id
 
-    # comment: returned value may be None
-    def get_sql_script(self) -> str:
+    def get_sql_script(self) -> str | None:
         """
         Returns the SQL script.
         Note: It makes sense to call the method only after llm has completed.
