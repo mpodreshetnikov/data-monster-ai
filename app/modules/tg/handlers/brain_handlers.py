@@ -1,12 +1,13 @@
+from enum import Enum
 import logging
 import json
-import datetime
 import uuid
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import (
     Application,
     MessageHandler,
+    ConversationHandler,
     CallbackQueryHandler,
     ContextTypes,
     filters,
@@ -18,14 +19,17 @@ from modules.tg.utils.texts import message_text_for
 from modules.tg.utils.decorators import a_only_allowed_users
 from modules.tg.utils.time_watching import ExecInfoStorage
 
-from modules.brain.main import Brain
+from modules.brain.main import Brain, BrainMode
 from modules.data_access.main import InternalDB
-from modules.data_access.models.brain_response_data import BrainResponseData
+from modules.common.errors import AgentLimitExceededAnswerException
 from ..web_app.main import WebApp, WebAppTypes
 from ..utils.button_id import ButtonId
 
 logger = logging.getLogger(__name__)
 
+
+class ConversationStates(Enum):
+    WAITING_FOR_CLARIFYING_ANSWER = 1
 
 def add_handlers(
     application: Application,
@@ -35,20 +39,32 @@ def add_handlers(
     s3client: S3Client | None = None,
 ):
     application.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            __get__ask_brain_handler__(brain, web_app_base_url, s3client, internal_db),
-        )
-    )
-
-    application.add_handler(
         CallbackQueryHandler(
-            lambda update, context: show_sql_callback(update, context, internal_db)
+            lambda update, context: show_sql_callback(update, context, internal_db),
+            block=False,
         )
     )
 
+    # TODO correctly implement handler
+    application.add_handler(ConversationHandler(
+        entry_points=[MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            __get__ask_brain_handler(brain, web_app_base_url, s3client, internal_db))],
+        states={
+            ConversationStates.WAITING_FOR_CLARIFYING_ANSWER: [
+                # TODO implement method for clarifying question. in it we need to get all data and send it to brain to answer again
+                MessageHandler(filters.TEXT & ~filters.COMMAND, __ask_brain_with_clarifying_answer)
+            ],
+        },
+        fallbacks=[MessageHandler(filters.ALL, __default_fallback)],
+        per_user=True,
+        per_chat=True,
+        name="ask_brain",
+        persistent=True,
+    ))
 
-def __get__ask_brain_handler__(
+
+def __get__ask_brain_handler(
     brain: Brain,
     web_app_base_url: str | None = None,
     s3client: S3Client | None = None,
@@ -112,7 +128,34 @@ def __get__ask_brain_handler__(
         exec_info_storage_key = f"{chat_id}_{user_id}"
         exec_info_storage.start(exec_info_storage_key)
 
-        answer = await brain.answer(question, ray_id)
+        answer = None
+        try:
+            answer = await brain.answer(question, ray_id, mode=BrainMode.SHORT)
+        except AgentLimitExceededAnswerException as e:
+            # TODO write statistics correctly            
+            if not e.last_prompt:
+                raise e
+
+            clarifying_question = None
+            try:
+                clarifying_question = await brain.make_clarifying_question(e.last_prompt, ray_id)
+            except Exception as _e:
+                logger.error(_e, exc_info=True)
+
+            if (
+                not clarifying_question
+                or clarifying_question.action == clarifying_question.Action.Restart
+            ):
+                logger.info(f"No clarifying question was generated. ray_id: {ray_id}. Restarting the brain answering...")
+                answer = await brain.answer(question, ray_id, mode=BrainMode.DEFAULT)
+                
+            # TODO write last answer and clarifying question to db (to get it in another callback)
+            # TODO send clarifying question to user
+            return ConversationStates.WAITING_FOR_CLARIFYING_ANSWER
+            
+        
+        if not answer:
+            raise ValueError(f"Empty answer. ray_id: {ray_id}.")
 
         logger.info(
             f"User {username}:{user_id} got brain answer: {str(answer.answer_text)}"

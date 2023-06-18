@@ -1,3 +1,4 @@
+from enum import Enum
 import logging
 from dataclasses import dataclass
 from typing import Any
@@ -34,6 +35,10 @@ from modules.brain.llm.prompts.chart_prompts import (
     ChartParams,
     build_data_example_for_prompt,
 )
+from modules.brain.llm.prompts.clarifying_question_prompts import (
+    CLARIFYING_QUESTION_PROMPT,
+    ClarifyingQuestionParams,
+)
 from modules.brain.llm.monitoring.callback import LogLLMRayCallbackHandler
 from modules.brain.llm.parsers.custom_output_parser import CustomAgentOutputParser
 from modules.brain.llm.parsers.custom_output_parser import LastPromptSaverCallbackHandler
@@ -56,6 +61,20 @@ class Answer:
     sql_script: str | None = None
     chart_params: ChartParams | None = None
     chart_data: list[dict] | None = None
+
+
+class BrainMode(Enum):
+    SHORT = 1
+    """Minimum agent iterations"""
+    DEFAULT = 2
+    """Default agent iterations"""
+
+
+class Constants:
+    MIN_SQL_AGENT_ITERATIONS = 2
+    """By the statistics, bot answers correctly instantly in 85% cases (for good questions)"""
+    DEFAULT_SQL_AGENT_ITERATIONS = 4
+    """By the statistics, bot answers correctly in 3-4 iterations in 100% cases (for good questions)"""
 
 
 class Brain:
@@ -97,10 +116,17 @@ class Brain:
             db_hints_doc_path, db_comments_override_path, sql_query_examples_path
         )
 
-    async def answer(self, question: str, ray_id: str) -> Answer:
+    async def answer(self, question: str, ray_id: str, mode: BrainMode = BrainMode.DEFAULT) -> Answer:
         ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path, ray_id=ray_id)
         answer = Answer(question, ray_id)
-        answer.answer_text = await self.__provide_text_answer(question, ray_logger, ray_id)
+
+        sql_agent_iter_limit = (
+            Constants.MIN_SQL_AGENT_ITERATIONS
+            if mode == BrainMode.SHORT
+            else Constants.DEFAULT_SQL_AGENT_ITERATIONS
+        )
+        answer.answer_text = await self.__provide_text_answer(question, ray_logger, ray_id, sql_agent_iter_limit)
+
         answer.sql_script = ray_logger.get_sql_script()
 
         try:
@@ -115,6 +141,25 @@ class Brain:
         await self.__save_brain_response(answer)
         return answer
 
+    async def make_clarifying_question(self, context: str, ray_id: str) -> ClarifyingQuestionParams | None:
+        ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path, ray_id=ray_id)
+
+        chain = LLMChain(
+            llm=self.default_llm,
+            prompt=CLARIFYING_QUESTION_PROMPT,
+            verbose=self._verbose,
+        )
+        with get_openai_callback() as openai_cb:
+            try:
+                result = await chain.apredict_and_parse(
+                    callbacks=[ray_logger] if ray_logger else [],
+                    context=context,
+                )
+            finally:
+                logger.info(openai_cb)
+
+        return result
+
     async def __save_brain_response(self, answer: Answer) -> None:
         try:
             await self.internal_db.brain_response_repository.add(
@@ -124,10 +169,11 @@ class Brain:
             logger.error(e, exc_info=True)
             
     async def __provide_text_answer(
-        self, question: str, ray_logger: LogLLMRayCallbackHandler, ray_id:str
+        self, question: str, ray_logger: LogLLMRayCallbackHandler, ray_id: str, sql_agent_iter_limit: int = 5
     ) -> str:
         last_prompt_saver = LastPromptSaverCallbackHandler()
-        sql_agent_chain =  await self.__build_sql_agent_chain(question, last_prompt_saver)
+        sql_agent_chain =  await self.__build_sql_agent_chain(
+            question, last_prompt_saver, agent_iter_limit=sql_agent_iter_limit)
         lang_translator_chain = self.__build_lang_translator_chain()
 
         overall_chain = SimpleSequentialChain(
@@ -213,6 +259,7 @@ class Brain:
         question: str,
         last_prompt_saver: LastPromptSaverCallbackHandler,
         llm: BaseLanguageModel | None = None,
+        agent_iter_limit: int = 5,
     ) -> Chain:
         hints_str = await get_formatted_hints(
             self._default_sql_llm_toolkit,
@@ -232,6 +279,7 @@ class Brain:
             llm=llm or self.default_llm,
             suffix=agent_suffix,
             output_parser=output_parser,
+            agent_iter_limit=agent_iter_limit,
         )
 
         return agent_executor
@@ -249,6 +297,7 @@ class Brain:
         max_execution_time: float | None = None,
         early_stopping_method: str = "force",
         agent_executor_kwargs: dict[str, Any] | None = None,
+        agent_iter_limit: int = 5,
         **kwargs,
     ):
         """
@@ -284,7 +333,7 @@ class Brain:
             tools=tools,
             callback_manager=callback_manager,
             verbose=self._verbose,
-            max_iterations=2,
+            max_iterations=agent_iter_limit,
             max_execution_time=max_execution_time,
             early_stopping_method=early_stopping_method,
             **(agent_executor_kwargs or {}),

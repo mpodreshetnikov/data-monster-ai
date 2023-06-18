@@ -20,7 +20,7 @@ class BotAnswerExceptionBase(Exception):
 
 @dataclass
 class AgentLimitExceededAnswerException(BotAnswerExceptionBase):
-    pass
+    last_prompt: str # TODO fill the field
 
 
 @dataclass
