@@ -1,5 +1,5 @@
 import logging
-from ..models.brain_response_data import BrainResponseData
+from ..models.brain_response_data import BrainResponseData, BrainResponseType
 from .i_repository import IRepository
 from sqlalchemy import select
 
@@ -10,10 +10,18 @@ class BrainResponseRepository(IRepository):
     def __init__(self, async_session):
         self.async_session = async_session
 
-    async def add(self, ray_id, question, sql_script, answer):
+    async def add(
+            self,
+            ray_id: str,
+            question: str,
+            answer: str,
+            sql_script: str | None = None,
+            type: BrainResponseType = BrainResponseType.SQL
+        ):
         async with self.async_session() as session:
             brain_response_data = BrainResponseData(
                 user_request_ray_id=ray_id,
+                type=type,
                 question=question,
                 sql_script=sql_script,
                 answer=answer,

@@ -48,6 +48,7 @@ from modules.common.errors import (
 from modules.common.sql_helpers import update_limit
 
 from modules.data_access.main import InternalDB
+from modules.data_access.models.brain_response_data import BrainResponseType
 
 
 logger = logging.getLogger(__name__)
@@ -151,19 +152,25 @@ class Brain:
         )
         with get_openai_callback() as openai_cb:
             try:
-                result = await chain.apredict_and_parse(
+                result: ClarifyingQuestionParams | None = await chain.apredict_and_parse(
                     callbacks=[ray_logger] if ray_logger else [],
                     context=context,
-                )
+                ) # type: ignore
             finally:
                 logger.info(openai_cb)
 
+        if not result:
+            return None
+
+        answer = Answer(context, ray_id, result.clarifying_question)
+        await self.__save_brain_response(answer, BrainResponseType.CLARIFYING_QUESTION)
+
         return result
 
-    async def __save_brain_response(self, answer: Answer) -> None:
+    async def __save_brain_response(self, answer: Answer, type: BrainResponseType = BrainResponseType.SQL) -> None:
         try:
             await self.internal_db.brain_response_repository.add(
-                answer.ray_id, answer.question, answer.sql_script, answer.answer_text
+                answer.ray_id, answer.question, answer.answer_text or "", answer.sql_script, type
             )
         except Exception as e:
             logger.error(e, exc_info=True)

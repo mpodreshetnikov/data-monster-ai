@@ -19,9 +19,10 @@ from modules.tg.utils.texts import message_text_for
 from modules.tg.utils.decorators import a_only_allowed_users
 from modules.tg.utils.time_watching import ExecInfoStorage
 
-from modules.brain.main import Brain, BrainMode
+from modules.brain.main import Brain, BrainMode, Answer
 from modules.data_access.main import InternalDB
 from modules.common.errors import AgentLimitExceededAnswerException
+from modules.tg.utils.tg_params_helpers import get_params
 from ..web_app.main import WebApp, WebAppTypes
 from ..utils.button_id import ButtonId
 
@@ -59,8 +60,6 @@ def add_handlers(
         fallbacks=[MessageHandler(filters.ALL, __default_fallback)],
         per_user=True,
         per_chat=True,
-        name="ask_brain",
-        persistent=True,
     ))
 
 
@@ -81,26 +80,11 @@ def __get__ask_brain_handler(
 
     @a_only_allowed_users
     async def __ask_brain_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        chat_id = update.effective_chat.id if update.effective_chat else None
-        user_id = update.effective_user.id if update.effective_user else None
-        message_id = update.effective_message.message_id if update.effective_message else None
-        question = (
-            " ".join(context.args)
-            if context.args
-            else update.message.text
-            if update.message
-            else None
-        )
+        chat_id, user_id, username, _, question, user_data = get_params(update, context)
 
         ray_id = str(uuid.uuid4())
         # comment: what if the bot will also be in group chats and ask questions there? hm.. let's leave todo about that
-        context.user_data["ray_id"] = ray_id
-        if not chat_id or not user_id or not question or not message_id:
-            raise ValueError(
-                "Empty chat_id or message_id or user_id or question provided"
-            )
-
-        username = update.effective_user.username if update.effective_user else None
+        user_data["ray_id"] = ray_id
 
         try:
             await internal_db.user_request_repository.add(
@@ -132,26 +116,29 @@ def __get__ask_brain_handler(
         try:
             answer = await brain.answer(question, ray_id, mode=BrainMode.SHORT)
         except AgentLimitExceededAnswerException as e:
-            # TODO write statistics correctly            
-            if not e.last_prompt:
+            # TODO write statistics correctly ???
+            if not e.agent_work_text:
                 raise e
 
             clarifying_question = None
             try:
-                clarifying_question = await brain.make_clarifying_question(e.last_prompt, ray_id)
+                clarifying_question = await brain.make_clarifying_question(e.agent_work_text, ray_id)
             except Exception as _e:
                 logger.error(_e, exc_info=True)
 
             if (
                 not clarifying_question
                 or clarifying_question.action == clarifying_question.Action.Restart
+                or not clarifying_question.clarifying_question
             ):
                 logger.info(f"No clarifying question was generated. ray_id: {ray_id}. Restarting the brain answering...")
                 answer = await brain.answer(question, ray_id, mode=BrainMode.DEFAULT)
-                
-            # TODO write last answer and clarifying question to db (to get it in another callback)
-            # TODO send clarifying question to user
-            return ConversationStates.WAITING_FOR_CLARIFYING_ANSWER
+            else:
+                await context.bot.send_message(
+                    chat_id,
+                    clarifying_question.clarifying_question,
+                )
+                return ConversationStates.WAITING_FOR_CLARIFYING_ANSWER
             
         
         if not answer:
