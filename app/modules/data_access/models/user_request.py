@@ -1,5 +1,6 @@
-from sqlalchemy import Column, String, Integer
+from sqlalchemy import Column, String, Integer, DateTime
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from .base import Base
 
 
@@ -7,7 +8,7 @@ class UserRequest(Base):
     __tablename__ = "user_request"
 
     ray_id = Column(String, primary_key=True)
-    timestamp = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     username = Column(String, nullable=False)
     user_id = Column(Integer, nullable=False)
 

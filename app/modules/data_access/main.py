@@ -5,7 +5,7 @@ from sqlalchemy_utils import database_exists, create_database
 from .repositories.user_request_repository import UserRequestRepository
 from .repositories.brain_response_repository import BrainResponseRepository
 from .repositories.request_outcome_repository import RequestOutcomeRepository
-from sqlalchemy import create_engine
+from sqlalchemy import URL, create_engine
 from .models.base import Base
 
 
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class InternalDB:
-    def __init__(self, url, aurl, **kwargs):
+    def __init__(self, url: URL, aurl: URL, **kwargs):
         self.url = url
         self.aurl = aurl
         self.sync_engine = create_engine(self.url, echo=True)
