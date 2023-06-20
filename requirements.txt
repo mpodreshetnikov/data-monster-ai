@@ -12,3 +12,5 @@ boto3==1.26.152
 boto3_stubs==1.26.155
 mypy_boto3_s3==1.26.127
 asyncpg==0.27.0
+greenlet==2.0.2
+alembic==1.11.1

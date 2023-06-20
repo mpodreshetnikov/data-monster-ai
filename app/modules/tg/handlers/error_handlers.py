@@ -22,6 +22,7 @@ def add_handlers(application: Application, internal_db: InternalDB):
 
 
 async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE, internal_db: InternalDB):
+    # TODO logic not actual anymore, brain errors are cathced inside brain handlers
     error = context.error
 
     username = update.effective_user.username if update.effective_user else None

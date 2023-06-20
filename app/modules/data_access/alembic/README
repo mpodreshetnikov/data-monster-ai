@@ -1,0 +1,7 @@
+Generic single-database configuration.
+
+Creating migration:
+```
+1) RUN alembic revision --autogenerate -m "migration name"
+2) File of migration will be created. Then you MUST look at it and make changes if needed.
+```

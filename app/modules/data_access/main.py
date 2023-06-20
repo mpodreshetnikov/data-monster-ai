@@ -11,7 +11,6 @@ from .models.base import Base
 
 logger = logging.getLogger(__name__)
 
-
 class InternalDB:
     def __init__(self, url: URL, aurl: URL):
         self.url = url

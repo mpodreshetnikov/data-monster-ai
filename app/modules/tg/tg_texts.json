@@ -2,7 +2,7 @@
     "hello": "Привет, {name}! Я твой личный аналитик по сети аптек Губернские Аптеки. Я знаю, кто работает в этой сети и что продает. Можешь спрашивать меня об аптеках, продажах товаров, кассовых сменах и сотрудниках. Что хочешь узнать?",
     "brain_thinking": "Собираю информацию...",
     "brain_thinking_with_time": "Собираю информацию...\nСреднее время ожидания ответа - {seconds}с.",
-    "answer_with_ray_id": "{answer}\n<i>ray_id: {ray_id}</i>",
+    "answer": "{answer}\n<i>ray_id: {ray_id}</i>",
     "answer_open_chart_button": "График",
     "answer_show_sql_button": "SQL-код",
     "answer_with_sql_script": "{answer}\n\nSQL:\n{sql_script}",

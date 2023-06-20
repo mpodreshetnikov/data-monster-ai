@@ -7,7 +7,6 @@ from langchain.chat_models import ChatOpenAI
 from langchain.base_language import BaseLanguageModel
 from mypy_boto3_s3 import S3Client
 from sqlalchemy import URL
-import json
 import boto3
 import uuid
 import modules.tg.main as tg
@@ -166,6 +165,10 @@ def __configure_s3(config: ConfigParser):
     client.list_buckets()
 
     return client
+
+
+def __configure_alembic():
+    pass
 
 
 if __name__ == "__main__":

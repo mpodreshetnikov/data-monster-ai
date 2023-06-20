@@ -18,14 +18,21 @@ from mypy_boto3_s3 import S3Client
 from modules.tg.utils.texts import message_text_for
 from modules.tg.utils.decorators import a_only_allowed_users
 from modules.tg.utils.time_watching import ExecInfoStorage
+from modules.tg.utils.exceptions import UserNotAllowedException
 
 from modules.brain.main import Brain, BrainMode, Answer
 from modules.data_access.main import InternalDB
-from modules.common.errors import AgentLimitExceededAnswerException
 from modules.tg.utils.tg_params_helpers import get_params
+from modules.tg.utils.decorators import a_handle_errors_with
 from modules.common.helpers import a_exec_no_raise
 from ..web_app.main import WebApp, WebAppTypes
 from ..utils.buttons import ButtonId, build_keybord
+
+from modules.common.errors import (
+    get_info_from_exception, AgentLimitExceededAnswerException,
+    SQLTimeoutAnswerException, CreatedNotWorkingSQLAnswerException,
+    NoDataReturnedFromDBAnswerException, LLMContextExceededAnswerException)
+
 
 logger = logging.getLogger(__name__)
 
@@ -47,90 +54,24 @@ def add_handlers(
         )
     )
 
-    # TODO implement exception handling during conversation https://github.com/python-telegram-bot/python-telegram-bot/issues/2277#issuecomment-757501019
     application.add_handler(ConversationHandler(
         entry_points=[MessageHandler(
             filters.TEXT & ~filters.COMMAND,
             __get__ask_brain_handler(brain, web_app_base_url, s3client, internal_db))],
         states={
             ConversationStates.WAITING_FOR_CLARIFYING_ANSWER: [
-                # TODO implement method for clarifying question. in it we need to get all data and send it to brain to answer again
                 MessageHandler(filters.TEXT & ~filters.COMMAND,
                     __get__ask_brain_with_clarifying_answer(brain, web_app_base_url, s3client, internal_db))
             ],
         },
-        fallbacks=[MessageHandler(filters.ALL, __default_fallback)],
+        fallbacks=[MessageHandler(filters.ALL, __default_conversation_fallback)],
         per_user=True,
         per_chat=True,
     ))
 
 
-def __create_chart_and_get_chart_button(
-    answer: Answer,
-    web_app_base_url: str | None,
-    s3client: S3Client | None,
-) -> InlineKeyboardButton | None:
-    chart_button = None
-    if answer.chart_params and web_app_base_url and s3client:
-        try:
-            web_app = WebApp(WebAppTypes.CHART_PAGE, web_app_base_url, s3client)
-            page_url = web_app.create_and_save(answer)
-            chart_button = InlineKeyboardButton(
-                text=message_text_for("answer_open_chart_button"),
-                web_app=WebAppInfo(url=page_url),
-            )
-        except Exception as e:
-            logger.error("failed to create_and_save", str(e), exc_info=True)
-            chart_button = None
-    return chart_button
-
-
-def __get_sql_script_button(answer: Answer) -> InlineKeyboardButton | None:
-    if answer.sql_script:
-        return InlineKeyboardButton(
-            text=message_text_for("answer_show_sql_button"),
-            callback_data=json.dumps(
-                {"id": ButtonId.ID_SQL_BUTTON.value, "ray_id": answer.ray_id}
-            ),
-        )
-    return None
-
-
-async def __send_user_awaiting_for_answer_message(
-        chat_id: int, exec_info_storage: ExecInfoStorage, context: ContextTypes.DEFAULT_TYPE):
-    seconds = None
-    if exec_info_storage:
-        seconds = exec_info_storage.average()
-    if seconds:
-        await context.bot.send_message(
-            chat_id,
-            message_text_for("brain_thinking_with_time", seconds=seconds),
-            parse_mode="HTML",
-        )
-    else:
-        await context.bot.send_message(
-            chat_id, message_text_for("brain_thinking"), parse_mode="HTML"
-        )
-
-
-async def __send_answer(
-    chat_id: int,
-    context: ContextTypes.DEFAULT_TYPE,
-    answer: Answer,
-    reply_markup: InlineKeyboardMarkup | None = None,
-):
-    await context.bot.send_message(
-        chat_id,
-        message_text_for(
-            "answer_with_ray_id", answer=answer.answer_text, ray_id=answer.ray_id
-        ),
-        parse_mode="HTML",
-        reply_markup=reply_markup, # type: ignore
-    )
-
-    await context.bot.send_message(
-        chat_id, message_text_for("continue_dialog"), parse_mode="HTML"
-    )
+async def __default_conversation_fallback(_u: Update, _c: ContextTypes.DEFAULT_TYPE):
+    return ConversationHandler.END
 
 
 def __get__ask_brain_with_clarifying_answer(
@@ -149,6 +90,7 @@ def __get__ask_brain_with_clarifying_answer(
     exec_info_storage = ExecInfoStorage(count=10)
 
     @a_only_allowed_users
+    @a_handle_errors_with(__ask_brain_error_handler__, internal_db=internal_db)
     async def __ask_brain_handler_with_clarifying_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id, user_id, username, _, user_answer, user_data = get_params(update, context)
 
@@ -215,6 +157,7 @@ def __get__ask_brain_handler(
     exec_info_storage = ExecInfoStorage(count=10)
 
     @a_only_allowed_users
+    @a_handle_errors_with(__ask_brain_error_handler__, internal_db=internal_db)
     async def __ask_brain_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id, user_id, username, _, question, user_data = get_params(update, context)
 
@@ -238,8 +181,6 @@ def __get__ask_brain_handler(
             answer = await brain.answer(question, ray_id, mode=BrainMode.SHORT)
         # Once catch agent limit exception and do clarifing question or restart the brain
         except AgentLimitExceededAnswerException as _e:
-            # TODO write statistics correctly ???
-            # TODO refactor this
             if not _e.agent_work_text:
                 raise _e
 
@@ -283,6 +224,63 @@ def __get__ask_brain_handler(
     return __ask_brain_handler
 
 
+async def __ask_brain_error_handler__(
+    error: Exception,
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    internal_db: InternalDB
+):
+    chat_id, user_id, username, _, _, user_data = get_params(update, context)
+    ray_id = user_data["ray_id"]
+
+    if not error:
+        logger.error("An unknown error occurred.")
+        await context.bot.send_message(chat_id, message_text_for("unknown_error"), parse_mode="HTML")
+        return ConversationHandler.END
+
+    logger.error(error, exc_info=True)
+
+    if isinstance(error, UserNotAllowedException):
+        method_name = error.method_name or "app"
+        logger.info(f"User {username}:{user_id} was not allowed to the {method_name}")
+        await a_exec_no_raise(
+            context.bot.send_message(chat_id, message_text_for("user_not_allowed"), parse_mode="HTML")
+        )
+        return ConversationHandler.END
+
+    error_message = ""
+    if isinstance(error, AgentLimitExceededAnswerException):
+        error_message = message_text_for("error_AgentLimitExceededAnswerException")
+    if isinstance(error, SQLTimeoutAnswerException):
+        error_message = message_text_for("error_SQLTimeoutAnswerException")
+    if isinstance(error, CreatedNotWorkingSQLAnswerException):
+        error_message = message_text_for("error_CreatedNotWorkingSQLAnswerException")
+    if isinstance(error, NoDataReturnedFromDBAnswerException):
+        error_message = message_text_for("error_NoDataReturnedFromDBAnswerException")
+    if isinstance(error, LLMContextExceededAnswerException):
+        error_message = message_text_for("error_LLMContextExceededAnswerException")
+    if not error_message:
+        error_message = message_text_for("unknown_error")
+
+    if ray_id:
+        ray_id_text = message_text_for("ray_id_ext", ray_id=ray_id)
+        error_message += ray_id_text
+
+    await a_exec_no_raise(
+        internal_db.request_outcome_repository.add(
+            ray_id=ray_id,
+            successful=False,
+            error=f"{type(error).__name__}: {error_message}",
+        )
+    )
+
+    await a_exec_no_raise(
+        context.bot.send_message(chat_id, error_message, parse_mode="HTML")
+    )
+
+    return ConversationHandler.END
+
+
 async def show_sql_callback(
     update: Update, context: ContextTypes.DEFAULT_TYPE, internal_db: InternalDB
 ):
@@ -318,3 +316,74 @@ async def show_sql_callback(
         await query.edit_message_text(
             text=query.message.text + message_text_for("not_found_script_error"),reply_markup = reply_markup
         )
+
+
+def __create_chart_and_get_chart_button(
+    answer: Answer,
+    web_app_base_url: str | None,
+    s3client: S3Client | None,
+) -> InlineKeyboardButton | None:
+    chart_button = None
+    if answer.chart_params and web_app_base_url and s3client:
+        try:
+            web_app = WebApp(WebAppTypes.CHART_PAGE, web_app_base_url, s3client)
+            page_url = web_app.create_and_save(answer)
+            chart_button = InlineKeyboardButton(
+                text=message_text_for("answer_open_chart_button"),
+                web_app=WebAppInfo(url=page_url),
+            )
+        except Exception as e:
+            logger.error("failed to create_and_save", str(e), exc_info=True)
+            chart_button = None
+    return chart_button
+
+
+def __get_sql_script_button(answer: Answer) -> InlineKeyboardButton | None:
+    if answer.sql_script:
+        return InlineKeyboardButton(
+            text=message_text_for("answer_show_sql_button"),
+            callback_data=json.dumps(
+                {"id": ButtonId.ID_SQL_BUTTON.value, "ray_id": answer.ray_id}
+            ),
+        )
+    return None
+
+
+async def __send_user_awaiting_for_answer_message(
+        chat_id: int, exec_info_storage: ExecInfoStorage, context: ContextTypes.DEFAULT_TYPE):
+    seconds = None
+    if exec_info_storage:
+        seconds = exec_info_storage.average()
+    if seconds:
+        await context.bot.send_message(
+            chat_id,
+            message_text_for("brain_thinking_with_time", seconds=seconds),
+            parse_mode="HTML",
+        )
+    else:
+        await context.bot.send_message(
+            chat_id, message_text_for("brain_thinking"), parse_mode="HTML"
+        )
+
+
+async def __send_answer(
+    chat_id: int,
+    context: ContextTypes.DEFAULT_TYPE,
+    answer: Answer,
+    reply_markup: InlineKeyboardMarkup | None = None,
+):
+    answer_message_text = message_text_for("answer", answer=answer.answer_text)
+    if answer.ray_id:
+        ray_id_text = message_text_for("ray_id_ext", ray_id=answer.ray_id)
+        answer_message_text += ray_id_text
+
+    await context.bot.send_message(
+        chat_id,
+        answer_message_text,
+        parse_mode="HTML",
+        reply_markup=reply_markup, # type: ignore
+    )
+
+    await context.bot.send_message(
+        chat_id, message_text_for("continue_dialog"), parse_mode="HTML"
+    )

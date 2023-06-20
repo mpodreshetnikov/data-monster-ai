@@ -6,7 +6,7 @@ __logger = getLogger(__name__)
 T = TypeVar("T")
 async def a_exec_no_raise(
     func: Coroutine[Any, Any, T],
-    logger: Logger | None = None
+    logger: Logger | None = None,
 ) -> T | None:
     if not func:
         raise ValueError("Func was not provided.")
