@@ -34,7 +34,7 @@ class UserRequestRepository(IRepository):
                 await session.commit()
 
 
-    async def get(self, ray_id):
+    async def get(self, ray_id) -> UserRequest | None:
         async with self.async_session() as session:
             result = await session.execute(
                     select(UserRequest)

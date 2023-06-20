@@ -8,13 +8,13 @@ def get_params(
     ) -> tuple[int, int, str, int, str, dict]:
     """
     Get params from update and context:
-    chat_id, user_id, username, message_id, question, user_data
+    chat_id, user_id, username, message_id, text, user_data
     """
     chat_id = update.effective_chat.id if update.effective_chat else None
     user_id = update.effective_user.id if update.effective_user else None
     username = update.effective_user.username if update.effective_user else None
     message_id = update.effective_message.message_id if update.effective_message else None
-    question = (
+    text = (
         " ".join(context.args)
         if context.args
         else update.message.text
@@ -26,9 +26,9 @@ def get_params(
     if not user_data:
         raise ValueError("No context.user_data provided")
     
-    if not chat_id or not user_id or not username or not message_id or not question:
+    if not chat_id or not user_id or not username or not message_id or not text:
         raise ValueError(
-            "Empty chat_id or message_id or user_id or question provided"
+            "Empty chat_id or message_id or user_id or message text provided"
         )
 
-    return (chat_id, user_id, username, message_id, question, user_data)
+    return (chat_id, user_id, username, message_id, text, user_data)

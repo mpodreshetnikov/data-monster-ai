@@ -333,7 +333,7 @@ class Brain:
                     early_stopping_method: str,
                     intermediate_steps: list[tuple[AgentAction, str]],
                     **kwargs: Any) -> AgentFinish:
-                raise AgentLimitExceededAnswerException()
+                raise AgentLimitExceededAnswerException("test")
         agent = ZeroShotAgentRaising(llm_chain=llm_chain, allowed_tools=tool_names, **kwargs)
         return AgentExecutor.from_agent_and_tools(
             agent=agent,

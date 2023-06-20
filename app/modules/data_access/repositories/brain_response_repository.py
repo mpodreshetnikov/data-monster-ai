@@ -71,3 +71,17 @@ class BrainResponseRepository(IRepository):
             brain_response_data = result.scalar_one_or_none()
             session.delete(brain_response_data)
             await session.commit()
+
+    async def get_last_clarifying_question(self, ray_id: str) -> BrainResponseData | None:
+        async with self.async_session() as session:
+            result = await session.execute(
+                    select(BrainResponseData)
+                    .where(BrainResponseData.user_request_ray_id == ray_id)
+                    .where(BrainResponseData.type == BrainResponseType.CLARIFYING_QUESTION)
+            )
+            brain_responses_data = result.scalars().all()
+            
+            if brain_responses_data:
+                return brain_responses_data[-1]
+            
+            return None

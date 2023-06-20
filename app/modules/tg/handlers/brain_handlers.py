@@ -24,7 +24,7 @@ from modules.data_access.main import InternalDB
 from modules.common.errors import AgentLimitExceededAnswerException
 from modules.tg.utils.tg_params_helpers import get_params
 from ..web_app.main import WebApp, WebAppTypes
-from ..utils.button_id import ButtonId
+from ..utils.buttons import ButtonId, build_keybord
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ def add_handlers(
         )
     )
 
-    # TODO correctly implement handler
+    # TODO implement exception handling during conversation https://github.com/python-telegram-bot/python-telegram-bot/issues/2277#issuecomment-757501019
     application.add_handler(ConversationHandler(
         entry_points=[MessageHandler(
             filters.TEXT & ~filters.COMMAND,
@@ -54,13 +54,150 @@ def add_handlers(
         states={
             ConversationStates.WAITING_FOR_CLARIFYING_ANSWER: [
                 # TODO implement method for clarifying question. in it we need to get all data and send it to brain to answer again
-                MessageHandler(filters.TEXT & ~filters.COMMAND, __ask_brain_with_clarifying_answer)
+                MessageHandler(filters.TEXT & ~filters.COMMAND,
+                    __get__ask_brain_with_clarifying_answer(brain, web_app_base_url, s3client, internal_db))
             ],
         },
         fallbacks=[MessageHandler(filters.ALL, __default_fallback)],
         per_user=True,
         per_chat=True,
     ))
+
+
+def __create_chart_and_get_chart_button(
+    answer: Answer,
+    web_app_base_url: str | None,
+    s3client: S3Client | None,
+) -> InlineKeyboardButton | None:
+    chart_button = None
+    if answer.chart_params and web_app_base_url and s3client:
+        try:
+            web_app = WebApp(WebAppTypes.CHART_PAGE, web_app_base_url, s3client)
+            page_url = web_app.create_and_save(answer)
+            chart_button = InlineKeyboardButton(
+                text=message_text_for("answer_open_chart_button"),
+                web_app=WebAppInfo(url=page_url),
+            )
+        except Exception as e:
+            logger.error("failed to create_and_save", str(e), exc_info=True)
+            chart_button = None
+    return chart_button
+
+
+def __get_sql_script_button(answer: Answer) -> InlineKeyboardButton | None:
+    if answer.sql_script:
+        return InlineKeyboardButton(
+            text=message_text_for("answer_show_sql_button"),
+            callback_data=json.dumps(
+                {"id": ButtonId.ID_SQL_BUTTON.value, "ray_id": answer.ray_id}
+            ),
+        )
+    return None
+
+
+async def __send_user_awaiting_for_answer_message(
+        chat_id: int, exec_info_storage: ExecInfoStorage, context: ContextTypes.DEFAULT_TYPE):
+    seconds = None
+    if exec_info_storage:
+        seconds = exec_info_storage.average()
+    if seconds:
+        await context.bot.send_message(
+            chat_id,
+            message_text_for("brain_thinking_with_time", seconds=seconds),
+            parse_mode="HTML",
+        )
+    else:
+        await context.bot.send_message(
+            chat_id, message_text_for("brain_thinking"), parse_mode="HTML"
+        )
+
+
+async def __send_answer(
+    chat_id: int,
+    context: ContextTypes.DEFAULT_TYPE,
+    answer: Answer,
+    reply_markup: InlineKeyboardMarkup | None = None,
+):
+    await context.bot.send_message(
+        chat_id,
+        message_text_for(
+            "answer_with_ray_id", answer=answer.answer_text, ray_id=answer.ray_id
+        ),
+        parse_mode="HTML",
+        reply_markup=reply_markup, # type: ignore
+    )
+
+    await context.bot.send_message(
+        chat_id, message_text_for("continue_dialog"), parse_mode="HTML"
+    )
+
+
+def __get__ask_brain_with_clarifying_answer(
+    brain: Brain,
+    web_app_base_url: str | None = None,
+    s3client: S3Client | None = None,
+    internal_db: InternalDB | None = None,
+):
+    if not web_app_base_url:
+        logger.warning("No web_app_base_url provided, chart page will not be available")
+    if not s3client:
+        logger.warning("No s3client provided, chart page will not be available")
+    if not internal_db:
+        raise ValueError("No internal_db provided")
+
+    exec_info_storage = ExecInfoStorage(count=10)
+
+    @a_only_allowed_users
+    async def __ask_brain_handler_with_clarifying_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        chat_id, user_id, username, _, user_answer, user_data = get_params(update, context)
+
+        ray_id = user_data.get("ray_id")
+        if not ray_id:
+            raise ValueError(
+                f"No ray_id in user_data while clarifying answer, cannot process the request correctly. tg_user_id: {user_id}")
+        initial_question = await internal_db.user_request_repository.get(ray_id)
+        if not initial_question:
+            raise ValueError(
+                f"No initial question in db while clarifying answer, cannot process the request correctly. tg_user_id: {user_id}")
+        clarifying_question = await internal_db.brain_response_repository.get_last_clarifying_question(ray_id)
+        if not clarifying_question:
+            raise ValueError(
+                f"No clarifying question in db while clarifying answer, cannot process the request correctly. tg_user_id: {user_id}")
+
+        question = f"{initial_question}\n{clarifying_question}\n{user_answer}"
+            
+        logger.info(f"User {username}:{user_id} asked a question with clarifying {question}")
+
+        await __send_user_awaiting_for_answer_message(chat_id, exec_info_storage, context)
+
+        exec_info_storage.start(ray_id)
+
+        # IMPORTANT, here we use not SHORT but DEFAULT mode.
+        answer = await brain.answer(question, ray_id, mode=BrainMode.DEFAULT)
+        if not answer:
+            raise ValueError(f"Empty answer. ray_id: {ray_id}.")
+        logger.info(
+            f"User {username}:{user_id} got brain answer: {str(answer.answer_text)}"
+        )
+
+        sql_button = __get_sql_script_button(answer)
+        chart_button = __create_chart_and_get_chart_button(answer, web_app_base_url, s3client)
+
+        exec_info_storage.stop(ray_id)
+
+        reply_markup = build_keybord(InlineKeyboardMarkup, [sql_button, chart_button], columns=2)
+        await __send_answer(chat_id, context, answer, reply_markup)
+
+        try:
+            await internal_db.request_outcome_repository.add(
+                ray_id=ray_id, successful=True, error=None
+            )
+        except Exception as e:
+            logger.error(e, exc_info=True)
+
+        return ConversationHandler.END
+
+    return __ask_brain_handler_with_clarifying_answer
 
 
 def __get__ask_brain_handler(
@@ -79,13 +216,14 @@ def __get__ask_brain_handler(
     exec_info_storage = ExecInfoStorage(count=10)
 
     @a_only_allowed_users
-    async def __ask_brain_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def __ask_brain_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id, user_id, username, _, question, user_data = get_params(update, context)
 
         ray_id = str(uuid.uuid4())
         # comment: what if the bot will also be in group chats and ask questions there? hm.. let's leave todo about that
         user_data["ray_id"] = ray_id
 
+        # TODO create common "no_raise" helper func
         try:
             await internal_db.user_request_repository.add(
                 ray_id=ray_id, username=username or "", user_id=user_id
@@ -95,28 +233,16 @@ def __get__ask_brain_handler(
             
         logger.info(f"User {username}:{user_id} asked a question {question}")
 
-        seconds = None
-        if exec_info_storage:
-            seconds = exec_info_storage.average()
-        if seconds:
-            await context.bot.send_message(
-                chat_id,
-                message_text_for("brain_thinking_with_time", seconds=seconds),
-                parse_mode="HTML",
-            )
-        else:
-            await context.bot.send_message(
-                chat_id, message_text_for("brain_thinking"), parse_mode="HTML"
-            )
+        await __send_user_awaiting_for_answer_message(chat_id, exec_info_storage, context)
 
-        exec_info_storage_key = f"{chat_id}_{user_id}"
-        exec_info_storage.start(exec_info_storage_key)
+        exec_info_storage.start(ray_id)
 
         answer = None
         try:
             answer = await brain.answer(question, ray_id, mode=BrainMode.SHORT)
         except AgentLimitExceededAnswerException as e:
             # TODO write statistics correctly ???
+            # TODO refactor this
             if not e.agent_work_text:
                 raise e
 
@@ -143,56 +269,17 @@ def __get__ask_brain_handler(
         
         if not answer:
             raise ValueError(f"Empty answer. ray_id: {ray_id}.")
-
         logger.info(
             f"User {username}:{user_id} got brain answer: {str(answer.answer_text)}"
         )
 
-        sql_button = None
-        chart_button = None
+        sql_button = __get_sql_script_button(answer)
+        chart_button = __create_chart_and_get_chart_button(answer, web_app_base_url, s3client)
 
-        if answer.sql_script:
-            sql_button = InlineKeyboardButton(
-                text=message_text_for("answer_show_sql_button"),
-                callback_data=json.dumps(
-                    {"id": ButtonId.ID_SQL_BUTTON.value, "ray_id": answer.ray_id}
-                ),
-            )
+        exec_info_storage.stop(ray_id)
 
-        if answer.chart_params and web_app_base_url and s3client:
-            try:
-                web_app = WebApp(WebAppTypes.CHART_PAGE, web_app_base_url, s3client)
-                page_url = web_app.create_and_save(answer)
-                chart_button = InlineKeyboardButton(
-                    text=message_text_for("answer_open_chart_button"),
-                    web_app=WebAppInfo(url=page_url),
-                )
-            except Exception as e:
-                logger.error("failed to create_and_save", str(e), exc_info=True)
-                chart_button = None
-
-        keyboard = []
-        if sql_button:
-            keyboard.append(sql_button)
-        if chart_button:
-            keyboard.append(chart_button)
-
-        reply_markup = InlineKeyboardMarkup([keyboard])
-
-        exec_info_storage.stop(exec_info_storage_key)
-
-        await context.bot.send_message(
-            chat_id,
-            message_text_for(
-                "answer_with_ray_id", answer=answer.answer_text, ray_id=answer.ray_id
-            ),
-            parse_mode="HTML",
-            reply_markup=reply_markup,
-        )
-
-        await context.bot.send_message(
-            chat_id, message_text_for("continue_dialog"), parse_mode="HTML"
-        )
+        reply_markup = build_keybord(InlineKeyboardMarkup, [sql_button, chart_button], columns=2)
+        await __send_answer(chat_id, context, answer, reply_markup)
 
         try:
             await internal_db.request_outcome_repository.add(
@@ -201,7 +288,7 @@ def __get__ask_brain_handler(
         except Exception as e:
             logger.error(e, exc_info=True)
 
-    return __ask_brain_handler__
+    return __ask_brain_handler
 
 
 async def show_sql_callback(
