@@ -23,6 +23,7 @@ from modules.brain.main import Brain, BrainMode, Answer
 from modules.data_access.main import InternalDB
 from modules.common.errors import AgentLimitExceededAnswerException
 from modules.tg.utils.tg_params_helpers import get_params
+from modules.common.helpers import a_exec_no_raise
 from ..web_app.main import WebApp, WebAppTypes
 from ..utils.buttons import ButtonId, build_keybord
 
@@ -188,12 +189,10 @@ def __get__ask_brain_with_clarifying_answer(
         reply_markup = build_keybord(InlineKeyboardMarkup, [sql_button, chart_button], columns=2)
         await __send_answer(chat_id, context, answer, reply_markup)
 
-        try:
-            await internal_db.request_outcome_repository.add(
+        await a_exec_no_raise(
+            internal_db.request_outcome_repository.add(
                 ray_id=ray_id, successful=True, error=None
-            )
-        except Exception as e:
-            logger.error(e, exc_info=True)
+        ))
 
         return ConversationHandler.END
 
@@ -223,13 +222,10 @@ def __get__ask_brain_handler(
         # comment: what if the bot will also be in group chats and ask questions there? hm.. let's leave todo about that
         user_data["ray_id"] = ray_id
 
-        # TODO create common "no_raise" helper func
-        try:
-            await internal_db.user_request_repository.add(
+        await a_exec_no_raise(
+            internal_db.user_request_repository.add(
                 ray_id=ray_id, username=username or "", user_id=user_id
-            )
-        except Exception as e:
-            logger.error(e, exc_info=True)
+        ))
             
         logger.info(f"User {username}:{user_id} asked a question {question}")
 
@@ -240,18 +236,16 @@ def __get__ask_brain_handler(
         answer = None
         try:
             answer = await brain.answer(question, ray_id, mode=BrainMode.SHORT)
-        except AgentLimitExceededAnswerException as e:
+        # Once catch agent limit exception and do clarifing question or restart the brain
+        except AgentLimitExceededAnswerException as _e:
             # TODO write statistics correctly ???
             # TODO refactor this
-            if not e.agent_work_text:
-                raise e
+            if not _e.agent_work_text:
+                raise _e
 
-            clarifying_question = None
-            try:
-                clarifying_question = await brain.make_clarifying_question(e.agent_work_text, ray_id)
-            except Exception as _e:
-                logger.error(_e, exc_info=True)
-
+            clarifying_question = await a_exec_no_raise(
+                brain.make_clarifying_question(_e.agent_work_text, ray_id)
+            )
             if (
                 not clarifying_question
                 or clarifying_question.action == clarifying_question.Action.Restart
@@ -265,8 +259,7 @@ def __get__ask_brain_handler(
                     clarifying_question.clarifying_question,
                 )
                 return ConversationStates.WAITING_FOR_CLARIFYING_ANSWER
-            
-        
+
         if not answer:
             raise ValueError(f"Empty answer. ray_id: {ray_id}.")
         logger.info(
@@ -281,12 +274,11 @@ def __get__ask_brain_handler(
         reply_markup = build_keybord(InlineKeyboardMarkup, [sql_button, chart_button], columns=2)
         await __send_answer(chat_id, context, answer, reply_markup)
 
-        try:
-            await internal_db.request_outcome_repository.add(
+        await a_exec_no_raise(
+            internal_db.request_outcome_repository.add(
                 ray_id=ray_id, successful=True, error=None
             )
-        except Exception as e:
-            logger.error(e, exc_info=True)
+        )
 
     return __ask_brain_handler
 
