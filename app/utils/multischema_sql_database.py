@@ -142,14 +142,22 @@ class MultischemaSQLDatabase(SQLDatabase):
             cursor = connection.execute(text(command))
             if cursor.returns_rows:
                 if fetch == "all":
-                    result = cursor.fetchall()
+                    results = cursor.fetchall()
+                    formatted_results = []
+                    for row in results:
+                        formatted_row = []
+                        for item in row:
+                            formatted_row.append(str(item))
+                            formatted_results.append(tuple(formatted_row))
+                    return str(formatted_results)
                 elif fetch == "one":
                     result = cursor.fetchone()[0]  # type: ignore
+                    formatted_results = [str(item) for item in result]
+                    return str(tuple(formatted_results))
                 else:
                     raise ValueError(
                         "Fetch parameter must be either 'one' or 'all'"
                     )
-                return str(result)
         return ""
 
     async def arun(self, command: str, fetch: str = "all") -> str:
@@ -175,12 +183,20 @@ class MultischemaSQLDatabase(SQLDatabase):
             cursor = await connection.execute(text(command))
             if cursor.returns_rows:
                 if fetch == "all":
-                    result = cursor.fetchall()
+                    results = cursor.fetchall()
+                    formatted_results = []
+                    for row in results:
+                        formatted_row = []
+                        for item in row:
+                            formatted_row.append(str(item))
+                            formatted_results.append(tuple(formatted_row))
+                    return str(formatted_results)
                 elif fetch == "one":
                     result = cursor.fetchone()[0]
+                    formatted_results = [str(item) for item in result]
+                    return str(tuple(formatted_results))
                 else:
                     raise ValueError("Fetch parameter must be either 'one' or 'all'")
-                return str(result)
         return ""
 
     @classmethod
