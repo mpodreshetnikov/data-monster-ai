@@ -334,8 +334,8 @@ class Brain:
                     intermediate_steps: list[tuple[AgentAction, str]],
                     **kwargs: Any) -> AgentFinish:
                 inputs = self.get_full_inputs(intermediate_steps, **kwargs)
-                agent_work_text = inputs.get("agent_scratchpad")
-                raise AgentLimitExceededAnswerException(agent_work_text=agent_work_text or "")
+                agent_work_text = inputs.get("agent_scratchpad", "")
+                raise AgentLimitExceededAnswerException(agent_work_text=agent_work_text)
         agent = ZeroShotAgentRaising(llm_chain=llm_chain, allowed_tools=tool_names, **kwargs)
         return AgentExecutor.from_agent_and_tools(
             agent=agent,
