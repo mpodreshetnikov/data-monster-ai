@@ -43,7 +43,7 @@ class ClarifyingQuestionParams:
 class ClarifyingQuestionOutputParser(BaseOutputParser):
     def parse(self, text: str) -> ClarifyingQuestionParams | None:
         action_type_pattern = r"(?:Действие|Action): (\w+)"
-        clarifying_question_pattern = r"(?:Уточняющий запрос|Lookup request): (.+)"
+        clarifying_question_pattern = r"(?:Уточняющий запрос|Clarifying question): (.+)"
 
         action_type_match = re.search(action_type_pattern, text, re.IGNORECASE)
         if action_type_match:
@@ -64,7 +64,7 @@ class ClarifyingQuestionOutputParser(BaseOutputParser):
         return ClarifyingQuestionParams(action=action_type, clarifying_question=clarifying_question)
 
     def contains_database_keywords(self, question: str) -> bool:
-        database_keywords = [r"\bстолбец[ыеах]\b", r"\bтаблиц[аеыу]\b", r"\bбаз[аеыу] данных\b"]
+        database_keywords = [r"\bстолбец[ыеах]\b", r"\bтаблиц[аеыу]\b", r"\bбаз[аеыу] данных\b", r"\btable\b", r"\bcolumn\b"]
         clarifying_question_parts = question.split(":")
         return any(
             re.search(keyword, part, re.IGNORECASE)
