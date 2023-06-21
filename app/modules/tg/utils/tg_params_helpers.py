@@ -23,7 +23,7 @@ def get_params(
     )
 
     user_data = context.user_data
-    if not user_data:
+    if user_data is None:
         raise ValueError("No context.user_data provided")
     
     if not chat_id or not user_id or not username or not message_id or not text:

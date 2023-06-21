@@ -29,7 +29,7 @@ from ..web_app.main import WebApp, WebAppTypes
 from ..utils.buttons import ButtonId, build_keybord
 
 from modules.common.errors import (
-    get_info_from_exception, AgentLimitExceededAnswerException,
+    AgentLimitExceededAnswerException,
     SQLTimeoutAnswerException, CreatedNotWorkingSQLAnswerException,
     NoDataReturnedFromDBAnswerException, LLMContextExceededAnswerException)
 
@@ -282,7 +282,7 @@ async def __ask_brain_error_handler__(
 
 
 async def show_sql_callback(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, internal_db: InternalDB
+    update: Update, _: ContextTypes.DEFAULT_TYPE, internal_db: InternalDB
 ):
     query = update.callback_query
     await query.answer()

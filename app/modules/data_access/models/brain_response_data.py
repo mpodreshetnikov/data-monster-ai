@@ -14,7 +14,7 @@ class BrainResponseData(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_request_ray_id = Column(String, ForeignKey("user_request.ray_id"), nullable=False)
-    type = Column(Enum, nullable=False, default=BrainResponseType.SQL)
+    type = Column(Enum(BrainResponseType), nullable=False, default=BrainResponseType.SQL, name="type")
     question = Column(String, nullable=False)
     answer = Column(String, nullable=False)
     sql_script = Column(String, nullable=True)

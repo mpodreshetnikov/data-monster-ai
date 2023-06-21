@@ -1,15 +1,32 @@
+from configparser import ConfigParser
 from logging.config import fileConfig
+import os
 
-from sqlalchemy import engine_from_config
+from sqlalchemy import URL, engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
 
-from ..models.base import Base
+from app.modules.data_access.models import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# setup internal database path
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+app_config = ConfigParser()
+app_config.read(os.path.join(__location__, "../../../settings.ini"))
+url = URL.create(
+    drivername=app_config.get("internal_db", "sync_drivername", fallback="postgresql"),
+    username=app_config.get("internal_db", "username"),
+    password=app_config.get("internal_db", "password"),
+    host=app_config.get("internal_db", "host"),
+    port=app_config.getint("internal_db", "port"),
+    database=app_config.get("internal_db", "database"),
+)
+internal_db_url = url.render_as_string(hide_password=False)
+config.set_main_option("sqlalchemy.url", internal_db_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -73,7 +90,6 @@ def run_migrations_online() -> None:
 
         with context.begin_transaction():
             context.run_migrations()
-
 
 if context.is_offline_mode():
     run_migrations_offline()

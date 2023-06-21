@@ -8,6 +8,6 @@ class RequestOutcome(Base):
 
     ray_id = Column(String, ForeignKey("user_request.ray_id"), primary_key=True)
     successful = Column(Boolean, nullable=False)
-    error = Column(String, nullable=False)
+    error = Column(String, nullable=True)
 
     user_request = relationship("UserRequest", back_populates="request_outcome")
