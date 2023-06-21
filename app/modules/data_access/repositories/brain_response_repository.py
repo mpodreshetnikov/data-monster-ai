@@ -1,7 +1,7 @@
 import logging
-from ..models.brain_response_data import BrainResponseData, BrainResponseType
+from ..models.brain_response_data import BrainResponseData, BrainResponseType, BrainResponseType
 from .i_repository import IRepository
-from sqlalchemy import select
+from sqlalchemy import select, and_
 
 logger = logging.getLogger(__name__)
 
@@ -46,10 +46,10 @@ class BrainResponseRepository(IRepository):
         async with self.async_session() as session:
             result = await session.execute(
                 select(BrainResponseData)
-                .where(BrainResponseData.user_request_ray_id == ray_id)
+                .where(and_(BrainResponseData.user_request_ray_id == ray_id, BrainResponseData.type == BrainResponseType.SQL))
                 .limit(1)
             )
-            brain_response_data = result.scalar_one_or_none()
+            brain_response_data = result.scalar_one_or_none() 
             return brain_response_data
 
     async def get_all(self, ray_id):
