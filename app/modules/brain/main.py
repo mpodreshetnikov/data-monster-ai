@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass
 from typing import Any
+import asyncio
 
 from langchain import LLMChain, SQLDatabase
 from langchain.base_language import BaseLanguageModel
@@ -164,7 +165,7 @@ class Brain:
                     rows = result.fetchall()
                     columns = result.keys()
                     data: list[dict] = [dict(zip(columns, row)) for row in rows]
-            except OperationalError:
+            except (OperationalError, asyncio.TimeoutError):
                 if ray_logger.was_sql_timeout_error:
                     e = SQLTimeoutAnswerException()
                     e = add_info_to_exception(

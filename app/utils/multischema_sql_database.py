@@ -1,6 +1,8 @@
 from typing import Any, List, Optional
 import logging
 
+from modules.common.timeout_execution import execute_with_timeout
+
 from typing import Any, List, Optional
 
 from langchain import SQLDatabase
@@ -34,6 +36,7 @@ class MultischemaSQLDatabase(SQLDatabase):
         indexes_in_table_info: bool = False,
         custom_table_info: Optional[dict] = None,
         view_support: bool = False,
+        **kwargs
     ):
 
         self._engine = sync_engine
@@ -47,6 +50,7 @@ class MultischemaSQLDatabase(SQLDatabase):
         self._custom_table_info = custom_table_info
         self.view_support = view_support
         self._inspector = inspect(self._engine)
+        self.timeout_seconds = kwargs.get("timeout_seconds", None)
 
         if include_tables and ignore_tables:
             raise ValueError("Cannot specify both include_tables and ignore_tables")
@@ -180,7 +184,7 @@ class MultischemaSQLDatabase(SQLDatabase):
                     await connection.exec_driver_sql(
                         f"SET search_path TO {self._schema}"
                     )
-            cursor = await connection.execute(text(command))
+            cursor = await execute_with_timeout(connection.execute(text(command)), self.timeout_seconds)
             if cursor.returns_rows:
                 if fetch == "all":
                     results = cursor.fetchall()
