@@ -42,17 +42,17 @@ class ClarifyingQuestionParams:
 
 class ClarifyingQuestionOutputParser(BaseOutputParser):
     def parse(self, text: str) -> ClarifyingQuestionParams | None:
-        action_type_pattern = r"Действие: (\w+)"
-        clarifying_question_pattern = r"Уточняющий запрос: (.+)"
+        action_type_pattern = r"(?:Действие|Action): (\w+)"
+        clarifying_question_pattern = r"(?:Уточняющий запрос|Lookup request): (.+)"
 
-        action_type_match = re.search(action_type_pattern, text)
+        action_type_match = re.search(action_type_pattern, text, re.IGNORECASE)
         if action_type_match:
             action_type_value = action_type_match[1]
             action_type = ClarifyingQuestionParams.Action(action_type_value)
         else:
             action_type = None
 
-        clarifying_question_match = re.search(clarifying_question_pattern, text, re.MULTILINE)
+        clarifying_question_match = re.search(clarifying_question_pattern, text, re.MULTILINE | re.IGNORECASE)
         if clarifying_question_match:
             clarifying_question = clarifying_question_match[1]
             if self.contains_database_keywords(clarifying_question):
