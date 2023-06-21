@@ -101,6 +101,7 @@ class Brain:
         verbose: bool = False,
         prompt_log_path: str | None = None,
         internal_db: InternalDB | None = None,
+        clarifying_question_llm:  BaseLanguageModel | None = None,
     ) -> None:
         self.db = db
         self._verbose = verbose
@@ -113,6 +114,7 @@ class Brain:
         if not llm:
             logger.warning("No llm provided, using default ChatOpenAI")
         self.default_llm = llm or ChatOpenAI(verbose=self._verbose)
+        self.clarifying_question_llm = clarifying_question_llm
         self._default_sql_llm_toolkit = self.__build_sql_llm_toolkit(
             db_hints_doc_path, db_comments_override_path, sql_query_examples_path
         )
@@ -146,7 +148,7 @@ class Brain:
         ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path, ray_id=ray_id)
 
         chain = LLMChain(
-            llm=self.default_llm,
+            llm=self.clarifying_question_llm or self.default_llm,
             prompt=CLARIFYING_QUESTION_PROMPT,
             verbose=self._verbose,
         )

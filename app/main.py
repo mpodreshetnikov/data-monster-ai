@@ -64,10 +64,12 @@ def __run_bot_and_block_thread__(
 def __configure_brain__(config: ConfigParser) -> Brain:
     verbose = config.getboolean("debug", "verbose", fallback=False)
     client_db = __configure_client_db__(config)
-    llm = __configure_llm__(config)
+    low_temp_llm = __configure_llm__(config, temperature_suffix="low")
+    high_temp_llm = __configure_llm__(config, temperature_suffix="high")
     return Brain(
         db=client_db,
-        llm=llm,
+        llm=low_temp_llm,
+        clarifying_question_llm=high_temp_llm,
         db_hints_doc_path=config.get("hints", "db_hints_doc_path"),
         db_comments_override_path=config.get("hints", "db_comments_override_path"),
         prompt_log_path=config.get("debug", "prompt_log_path"),
@@ -77,10 +79,10 @@ def __configure_brain__(config: ConfigParser) -> Brain:
     )
 
 
-def __configure_llm__(config: ConfigParser) -> BaseLanguageModel:
+def __configure_llm__(config: ConfigParser, temperature_suffix: str) -> BaseLanguageModel:
     verbose = config.getboolean("debug", "verbose", fallback=False)
     openai_api_key = config.get("openai", "api_key")
-    temperature = config.getfloat("openai", "temperature", fallback=0.7)
+    temperature = config.getfloat("openai", f"temperature_{temperature_suffix}", fallback=0.7)
     os.environ["OPENAI_API_KEY"] = openai_api_key
     return ChatOpenAI(verbose=verbose, temperature=temperature)
 
