@@ -23,6 +23,7 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('username', sa.String(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('question', sa.String(), nullable=True),
     sa.PrimaryKeyConstraint('ray_id'),
     schema='bot_interaction_stats'
     )

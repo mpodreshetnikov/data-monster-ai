@@ -166,10 +166,5 @@ def __configure_s3(config: ConfigParser):
 
     return client
 
-
-def __configure_alembic():
-    pass
-
-
 if __name__ == "__main__":
     main()

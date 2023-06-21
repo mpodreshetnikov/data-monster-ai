@@ -98,15 +98,19 @@ def __get__ask_brain_with_clarifying_answer(
         if not ray_id:
             raise ValueError(
                 f"No ray_id in user_data while clarifying answer, cannot process the request correctly. tg_user_id: {user_id}")
-        initial_question = await internal_db.user_request_repository.get(ray_id)
-        if not initial_question:
+        
+        user_request = await internal_db.user_request_repository.get(ray_id)
+        if not user_request:
             raise ValueError(
                 f"No initial question in db while clarifying answer, cannot process the request correctly. tg_user_id: {user_id}")
-        clarifying_question = await internal_db.brain_response_repository.get_last_clarifying_question(ray_id)
-        if not clarifying_question:
+        initial_question = user_request.question
+        
+        last_clarifying_brain_response = await internal_db.brain_response_repository.get_last_clarifying_question(ray_id)
+        if not last_clarifying_brain_response:
             raise ValueError(
                 f"No clarifying question in db while clarifying answer, cannot process the request correctly. tg_user_id: {user_id}")
-
+        clarifying_question = last_clarifying_brain_response.answer
+        
         question = f"{initial_question}\n{clarifying_question}\n{user_answer}"
             
         logger.info(f"User {username}:{user_id} asked a question with clarifying {question}")
@@ -167,7 +171,7 @@ def __get__ask_brain_handler(
 
         await a_exec_no_raise(
             internal_db.user_request_repository.add(
-                ray_id=ray_id, username=username or "", user_id=user_id
+                ray_id=ray_id, username=username or "", user_id=user_id, question=question
         ))
             
         logger.info(f"User {username}:{user_id} asked a question {question}")
@@ -199,6 +203,10 @@ def __get__ask_brain_handler(
                     chat_id,
                     clarifying_question.clarifying_question,
                 )
+                logger.info(
+                    f"User {username}:{user_id} got clarifying question: {str(clarifying_question.clarifying_question)}"
+                )
+                exec_info_storage.stop(ray_id)
                 return ConversationStates.WAITING_FOR_CLARIFYING_ANSWER
 
         if not answer:

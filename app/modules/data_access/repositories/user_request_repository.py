@@ -11,12 +11,13 @@ class UserRequestRepository(IRepository):
     def __init__(self, async_session):
         self.async_session = async_session
 
-    async def add(self, ray_id: str, username, user_id):
+    async def add(self, ray_id: str, username, user_id, question):
         async with self.async_session() as session:
             user_request = UserRequest(
                 ray_id=ray_id,
                 username=username,
                 user_id=user_id,
+                question=question,
             )
             session.add(user_request)
             await session.commit()

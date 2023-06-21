@@ -329,10 +329,11 @@ class Brain:
 
         class ZeroShotAgentRaising(ZeroShotAgent):
             def return_stopped_response(
-                    self,
-                    early_stopping_method: str,
-                    intermediate_steps: list[tuple[AgentAction, str]],
-                    **kwargs: Any) -> AgentFinish:
+                self,
+                early_stopping_method: str,
+                intermediate_steps: list[tuple[AgentAction, str]],
+                **kwargs: Any
+            ) -> AgentFinish:
                 inputs = self.get_full_inputs(intermediate_steps, **kwargs)
                 agent_work_text = inputs.get("agent_scratchpad", "")
                 raise AgentLimitExceededAnswerException(agent_work_text=agent_work_text)
