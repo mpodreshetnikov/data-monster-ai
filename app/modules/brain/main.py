@@ -44,7 +44,7 @@ from modules.brain.llm.monitoring.callback import LogLLMRayCallbackHandler
 from modules.brain.llm.parsers.custom_output_parser import CustomAgentOutputParser
 from modules.brain.llm.parsers.custom_output_parser import LastPromptSaverCallbackHandler
 from modules.common.errors import (
-    add_info_to_exception, AgentLimitExceededAnswerException, SQLTimeoutAnswerException,
+    add_info_to_exception, AgentLimitExceededAnswerException, SQLTimeoutAnswerException, 
     CreatedNotWorkingSQLAnswerException, NoDataReturnedFromDBAnswerException, LLMContextExceededAnswerException)
 from modules.common.sql_helpers import update_limit
 
@@ -240,8 +240,11 @@ class Brain:
                 e = add_info_to_exception(
                     e, "ray_id", ray_id)
                 raise e
-
-        return response
+            return response
+        e = CreatedNotWorkingSQLAnswerException()
+        e = add_info_to_exception(
+                    e, "ray_id", ray_id)
+        raise e
 
     def __build_sql_llm_toolkit(
         self,
