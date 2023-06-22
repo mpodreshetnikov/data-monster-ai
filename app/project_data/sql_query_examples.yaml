@@ -91,3 +91,15 @@ list:
       FROM items_with_analgin
       ORDER BY frequency DESC
       LIMIT 3;
+  - question: Самые продаваемые категории товаров/номенклатуры?
+    tables: [uas_cash_cheque_item, uas_data_med_nomenclature_todel, uas_data_med_kind_todel]
+    query: |
+      SELECT uas_data_med_kind_todel.name, SUM(uas_cash_cheque_item."result") AS total_quantity
+      FROM uas_cash_cheque_item
+      JOIN uas_data_med_nomenclature_todel ON uas_cash_cheque_item.nomencl_id = uas_data_med_nomenclature_todel.nomenclature_id
+      join uas_data_med_kind_todel on uas_data_med_kind_todel.med_kind_id  = uas_data_med_nomenclature_todel.kind_id 
+      GROUP BY uas_data_med_kind_todel.name
+      ORDER BY total_quantity DESC
+      LIMIT 10
+
+    
