@@ -77,7 +77,7 @@ class ListSQLDatabaseWithCommentsTool(ListSQLDatabaseTool):
         tool_input: str = "",
         run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
     ) -> str:
-        self.run(tool_input,run_manager)
+        return self.run(tool_input,run_manager)
 
 
 class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
@@ -112,7 +112,7 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
         tool_input: str = "",
         run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
     ) -> str:
-        self._run(table_name, tool_input, run_manager)
+        return self._run(table_name, tool_input, run_manager)
 
     ### Method was taken from InfoSQLDatabaseTool and modified to include column comments ###
     def __get_table_info(self, table_names):

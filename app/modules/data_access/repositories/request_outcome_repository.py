@@ -2,13 +2,14 @@ import logging
 from ..models.request_outcome import RequestOutcome
 from .i_repository import IRepository
 from sqlalchemy import select
+from modules.common.timeout_execution import execute_with_timeout
 
 logger = logging.getLogger(__name__)
 
-
 class RequestOutcomeRepository(IRepository):
-    def __init__(self, async_session):
+    def __init__(self, async_session, timeout_seconds):
         self.async_session = async_session
+        self.timeout_seconds = timeout_seconds
 
     async def add(self, ray_id, successful, error):
         async with self.async_session() as session:
@@ -16,14 +17,17 @@ class RequestOutcomeRepository(IRepository):
                 ray_id=ray_id, successful=successful, error=error
             )
             session.add(request_outcome)
-            await session.commit()
+            await execute_with_timeout(session.commit(), self.timeout_seconds)
 
     async def update(self, ray_id, new_data):
         async with self.async_session() as session:
-            result = await session.execute(
+            result = await execute_with_timeout(
+                session.execute(
                     select(RequestOutcome)
                     .where(RequestOutcome.ray_id == ray_id)
-                )
+                ),
+                self.timeout_seconds
+            )
             request_outcome = result.scalar_one_or_none()
 
             if request_outcome:
@@ -33,20 +37,26 @@ class RequestOutcomeRepository(IRepository):
 
     async def get(self, ray_id):
         async with self.async_session() as session:
-            result = await session.execute(
+            result = await execute_with_timeout(
+                session.execute(
                     select(RequestOutcome)
                     .where(RequestOutcome.ray_id == ray_id)
-                )
+                ),
+                self.timeout_seconds
+            )
             request_outcome = result.scalar_one_or_none()
             return request_outcome
 
     async def delete(self, ray_id):
         async with self.async_session() as session:
-            result = await session.execute(
+            result = await execute_with_timeout(
+                session.execute(
                     select(RequestOutcome)
                     .where(RequestOutcome.ray_id == ray_id)
-                )
+                ),
+                self.timeout_seconds
+            )
             request_outcome = result.scalar_one_or_none()
             if request_outcome:
                 session.delete(request_outcome)
-                await session.commit()
+                await execute_with_timeout(session.commit(), self.timeout_seconds)

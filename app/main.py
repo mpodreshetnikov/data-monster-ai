@@ -106,9 +106,11 @@ def __configure_client_db__(config: ConfigParser) -> SQLDatabase:
     )
     schema = config.get("client_db", "schema")
     include_tables = config.get("client_db", "tables_to_use").split(",")
-
+    
+    timeout_seconds = config.getint('client_db', 'timeout')
+    
     return MultischemaSQLDatabase.from_uri_async(
-        url=url, aurl=aurl, schema=schema, include_tables=include_tables
+    url=url, aurl=aurl, schema=schema, include_tables=include_tables, timeout_seconds=timeout_seconds
     )
 
 
@@ -149,7 +151,11 @@ def __configure_internal_db(config: ConfigParser) -> InternalDB:
         port=config.getint("internal_db", "port"),
         database=config.get("internal_db", "database"),
     )
-    return InternalDB(url, aurl)
+    
+    timeout_seconds = config.getint('internal_db', 'timeout')
+
+    return InternalDB(url, aurl, timeout_seconds=timeout_seconds)
+
 
 
 def __configure_s3(config: ConfigParser):

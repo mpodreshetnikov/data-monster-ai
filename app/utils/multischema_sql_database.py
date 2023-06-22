@@ -1,6 +1,8 @@
 from typing import Any, List, Optional
 import logging
 
+from modules.common.timeout_execution import execute_with_timeout
+
 from typing import Any, List, Optional
 
 from langchain import SQLDatabase
@@ -34,6 +36,7 @@ class MultischemaSQLDatabase(SQLDatabase):
         indexes_in_table_info: bool = False,
         custom_table_info: Optional[dict] = None,
         view_support: bool = False,
+        **kwargs
     ):
 
         self._engine = sync_engine
@@ -47,6 +50,7 @@ class MultischemaSQLDatabase(SQLDatabase):
         self._custom_table_info = custom_table_info
         self.view_support = view_support
         self._inspector = inspect(self._engine)
+        self.timeout_seconds = kwargs.get("timeout_seconds", None)
 
         if include_tables and ignore_tables:
             raise ValueError("Cannot specify both include_tables and ignore_tables")
@@ -142,14 +146,22 @@ class MultischemaSQLDatabase(SQLDatabase):
             cursor = connection.execute(text(command))
             if cursor.returns_rows:
                 if fetch == "all":
-                    result = cursor.fetchall()
+                    results = cursor.fetchall()
+                    formatted_results = []
+                    for row in results:
+                        formatted_row = []
+                        for item in row:
+                            formatted_row.append(str(item))
+                            formatted_results.append(tuple(formatted_row))
+                    return str(formatted_results)
                 elif fetch == "one":
                     result = cursor.fetchone()[0]  # type: ignore
+                    formatted_results = [str(item) for item in result]
+                    return str(tuple(formatted_results))
                 else:
                     raise ValueError(
                         "Fetch parameter must be either 'one' or 'all'"
                     )
-                return str(result)
         return ""
 
     async def arun(self, command: str, fetch: str = "all") -> str:
@@ -172,15 +184,23 @@ class MultischemaSQLDatabase(SQLDatabase):
                     await connection.exec_driver_sql(
                         f"SET search_path TO {self._schema}"
                     )
-            cursor = await connection.execute(text(command))
+            cursor = await execute_with_timeout(connection.execute(text(command)), self.timeout_seconds)
             if cursor.returns_rows:
                 if fetch == "all":
-                    result = cursor.fetchall()
+                    results = cursor.fetchall()
+                    formatted_results = []
+                    for row in results:
+                        formatted_row = []
+                        for item in row:
+                            formatted_row.append(str(item))
+                            formatted_results.append(tuple(formatted_row))
+                    return str(formatted_results)
                 elif fetch == "one":
                     result = cursor.fetchone()[0]
+                    formatted_results = [str(item) for item in result]
+                    return str(tuple(formatted_results))
                 else:
                     raise ValueError("Fetch parameter must be either 'one' or 'all'")
-                return str(result)
         return ""
 
     @classmethod
