@@ -6,7 +6,7 @@ from ..models.user_request import UserRequest
 class IRepository:
     async def add(
         self, ray_id: int, timestamp: str, username: str, user_id: int
-    ) -> None:
+    ) -> object:
         raise NotImplementedError
 
     async def update(self, ray_id: int, new_data: dict) -> None:

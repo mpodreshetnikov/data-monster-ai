@@ -32,7 +32,7 @@ from modules.common.errors import (
     AgentLimitExceededAnswerException,
     SQLTimeoutAnswerException, CreatedNotWorkingSQLAnswerException,
     NoDataReturnedFromDBAnswerException, LLMContextExceededAnswerException)
-
+from modules.data_access.models.brain_response_data import BrainResponseType
 
 logger = logging.getLogger(__name__)
 
@@ -298,7 +298,7 @@ async def show_sql_callback(
     callback_data = json.loads(query.data)
     ray_id = callback_data["ray_id"]
 
-    brain_response_data = await internal_db.brain_response_repository.get(ray_id = ray_id)
+    brain_response_data = await internal_db.brain_response_repository.get_by_type(ray_id = ray_id, type=BrainResponseType.SQL)
     reply_markup = query.message.reply_markup
     keyboard_without_sql = []
     for button_row in reply_markup.inline_keyboard:

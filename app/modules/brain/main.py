@@ -49,7 +49,7 @@ from modules.common.errors import (
 from modules.common.sql_helpers import update_limit
 
 from modules.data_access.main import InternalDB
-from modules.data_access.models.brain_response_data import BrainResponseType
+from modules.data_access.models.brain_response_data import BrainResponseType, BrainResponseData
 
 
 logger = logging.getLogger(__name__)
@@ -129,6 +129,9 @@ class Brain:
             if mode == BrainMode.SHORT
             else Constants.DEFAULT_SQL_AGENT_ITERATIONS
         )
+        if mode == BrainMode.SHORT:
+            brain_response = await self.__save_brain_response(answer)
+            
         answer.answer_text = await self.__provide_text_answer(question, ray_logger, ray_id, sql_agent_iter_limit)
 
         answer.sql_script = ray_logger.get_sql_script()
@@ -142,12 +145,15 @@ class Brain:
         except Exception:
             answer.chart_params = None
 
-        await self.__save_brain_response(answer)
+        if not brain_response:
+            brain_response = await self.__get_brain_response_sql(ray_id=ray_id)  
+        await self.__update_brain_response(brain_response = brain_response, answer = answer)
         return answer
 
     async def make_clarifying_question(self, context: str, ray_id: str) -> ClarifyingQuestionParams | None:
         ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path, ray_id=ray_id)
-
+        answer = Answer(context, ray_id)
+        brain_response_clrf = await self.__save_brain_response(answer = answer, type = BrainResponseType.CLARIFYING_QUESTION)
         chain = LLMChain(
             llm=self.clarifying_question_llm or self.default_llm,
             prompt=CLARIFYING_QUESTION_PROMPT,
@@ -164,17 +170,29 @@ class Brain:
 
         if not result:
             return None
-
-        answer = Answer(context, ray_id, result.clarifying_question)
-        await self.__save_brain_response(answer, BrainResponseType.CLARIFYING_QUESTION)
+        answer.answer_text = f'{result.action.name}: {result.clarifying_question}'
+        await self.__update_brain_response(brain_response = brain_response_clrf, answer = answer)
 
         return result
 
-    async def __save_brain_response(self, answer: Answer, type: BrainResponseType = BrainResponseType.SQL) -> None:
+    async def __get_brain_response_sql(self, ray_id:str) -> BrainResponseData:
         try:
-            await self.internal_db.brain_response_repository.add(
-                answer.ray_id, answer.question, answer.answer_text or "", answer.sql_script, type
+            return await self.internal_db.brain_response_repository.get_by_type(ray_id, BrainResponseType.SQL)
+        except Exception as e:
+            logger.error(e, exc_info=True)
+    async def __save_brain_response(self, answer: Answer, type: BrainResponseType = BrainResponseType.SQL) -> BrainResponseData | None:
+        try:
+            return await self.internal_db.brain_response_repository.add(
+                answer.ray_id, answer.question, answer.answer_text or None, answer.sql_script or None, type
             )
+        except Exception as e:
+            logger.error(e, exc_info=True)
+    
+    async def __update_brain_response(self, brain_response:BrainResponseData, answer: Answer,) -> BrainResponseData | None:
+        try:
+            brain_response.answer = answer.answer_text
+            brain_response.sql_script = answer.sql_script
+            await self.internal_db.brain_response_repository.update(brain_response)
         except Exception as e:
             logger.error(e, exc_info=True)
             

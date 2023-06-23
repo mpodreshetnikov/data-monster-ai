@@ -5,6 +5,20 @@ from .base import Base
 
 
 class UserRequest(Base):
+    """
+    Represents a user request made to our system.
+
+    Attributes:
+        ray_id (str): The unique identifier for the user request (primary key).
+        created_at (datetime): The timestamp of when the user request was created.
+        username (str): The username of the user making the request.
+        user_id (int): The user ID of the user making the request.
+        question (str): The initial question or input provided by the user.
+
+        brain_responses (List[BrainResponseData]): A list of brain response data associated with the user request.
+        request_outcome (RequestOutcome): The outcome of the user request.
+    """
+
     __tablename__ = "user_request"
 
     ray_id = Column(String, primary_key=True)
