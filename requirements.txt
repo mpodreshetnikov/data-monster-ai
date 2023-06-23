@@ -5,7 +5,7 @@ python-telegram-bot==20.3
 PyYAML==6.0
 SQLAlchemy==2.0.16
 psycopg2-binary==2.9.6
-chromadb==0.3.25
+chromadb==0.3.26
 tiktoken==0.4.0
 sqlalchemy_utils==0.41.1
 boto3==1.26.152
