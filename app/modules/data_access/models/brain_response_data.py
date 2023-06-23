@@ -12,10 +12,10 @@ class BrainResponseType(enum.Enum):
 
 class BrainResponseData(Base):
     """
-    In the general case, it is a script that can be used in the chain.
-    The main thing that the object should store:
-    1) Input: what it started working on;
-    2) Output: the result of the work;
+    Represents a script/chain/separate logical block that partially or completely solves the user's request or assists other scripts/chains/separate logical blocks in solving the problem.
+    The object as a whole should store:
+    1) Input data: what it started working on;
+    2) Output data: the result of the work;
     3) Additional information.
 
     Attributes:

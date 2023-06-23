@@ -1,11 +1,11 @@
 import asyncio
 import logging
-from typing import Coroutine, Any
+from typing import Coroutine
 
 
 logger = logging.getLogger(__name__)
 
-async def execute_with_timeout(coroutine:Coroutine, timeout_seconds: int) -> Any:
+async def execute_with_timeout(coroutine:Coroutine, timeout_seconds: int) -> Coroutine:
     if timeout_seconds is None:
         return await coroutine
     try:
