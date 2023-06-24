@@ -10,6 +10,6 @@ async def execute_with_timeout(coroutine:Coroutine, timeout_seconds: int) -> Cor
         return await coroutine
     try:
         return await asyncio.wait_for(coroutine, timeout=timeout_seconds)
-    except asyncio.TimeoutError as e :
+    except asyncio.TimeoutError as e:
         logger.warning("Query execution timed out")
-        raise(e)
+        raise e

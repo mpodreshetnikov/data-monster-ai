@@ -20,7 +20,7 @@ class BotAnswerExceptionBase(Exception):
 
 @dataclass
 class AgentLimitExceededAnswerException(BotAnswerExceptionBase):
-    pass
+    agent_work_text: str
 
 
 @dataclass

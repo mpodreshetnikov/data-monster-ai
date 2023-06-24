@@ -1,6 +1,5 @@
 import logging
 from ..models.user_request import UserRequest
-from .i_repository import IRepository
 from sqlalchemy import select
 from modules.common.timeout_execution import execute_with_timeout
 
@@ -8,57 +7,42 @@ from modules.common.timeout_execution import execute_with_timeout
 logger = logging.getLogger(__name__)
 
 
-class UserRequestRepository(IRepository):
+class UserRequestRepository():
     def __init__(self, async_session, timeout_seconds):
         self.async_session = async_session
         self.timeout_seconds = timeout_seconds
 
-    async def add(self, ray_id: str, username, user_id):
+    async def add(
+        self, ray_id: str, username: str, user_id: int, question: str
+    ) -> UserRequest:
         async with self.async_session() as session:
             user_request = UserRequest(
                 ray_id=ray_id,
                 username=username,
                 user_id=user_id,
+                question=question,
             )
             session.add(user_request)
             await execute_with_timeout(session.commit(), self.timeout_seconds)
-
-    async def update(self, ray_id, new_data):
-        async with self.async_session() as session:
-            result = await execute_with_timeout(
-                session.execute(
-                    select(UserRequest)
-                    .where(UserRequest.ray_id == ray_id)
-                ),
-                self.timeout_seconds
+            await execute_with_timeout(
+                session.refresh(user_request), self.timeout_seconds
             )
-            user_request = result.scalar_one_or_none()
-            if user_request:
-                for attr, value in new_data.items():
-                    setattr(user_request, attr, value)
-                await execute_with_timeout(session.commit(), self.timeout_seconds)
+            return user_request
 
-    async def get(self, ray_id):
+    async def update(self, user_request: UserRequest):
+        async with self.async_session() as session:
+            await execute_with_timeout(
+                session.merge(user_request), self.timeout_seconds
+            )
+            await execute_with_timeout(session.commit(), self.timeout_seconds)
+
+    async def get(self, ray_id: str) -> UserRequest | None:
         async with self.async_session() as session:
             result = await execute_with_timeout(
                 session.execute(
-                    select(UserRequest)
-                    .where(UserRequest.ray_id == ray_id)
+                    select(UserRequest).where(UserRequest.ray_id == ray_id)
                 ),
-                self.timeout_seconds
+                self.timeout_seconds,
             )
             user_request = result.scalar_one_or_none()
             return user_request
-
-    async def delete(self, ray_id):
-        async with self.async_session() as session:
-            result = await execute_with_timeout(
-                session.execute(
-                    select(UserRequest)
-                    .where(UserRequest.ray_id == ray_id)
-                ),
-                self.timeout_seconds
-            )
-            user_request = result.scalar_one_or_none()
-            session.delete(user_request)
-            await execute_with_timeout(session.commit(), self.timeout_seconds)

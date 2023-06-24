@@ -140,8 +140,8 @@ tables:
       - name: position
         comment: Должность, занимаемая сотрудником
   - name: uas_data_med_kind_todel
-    comment: Эта таблица содержит информацию о категории/вид номенклатуры/товаров
+    comment: Эта таблица содержит информацию о категории/виде номенклатуры/товаров
     columns:
       - name: med_kind_id
-        comment: id номенклатуры
+        comment: id категории
 
