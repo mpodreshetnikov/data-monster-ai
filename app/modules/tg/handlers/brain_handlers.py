@@ -32,7 +32,7 @@ from modules.common.errors import (
     AgentLimitExceededAnswerException,
     SQLTimeoutAnswerException, CreatedNotWorkingSQLAnswerException,
     NoDataReturnedFromDBAnswerException, LLMContextExceededAnswerException)
-
+from modules.data_access.models.brain_response_data import BrainResponseType
 
 logger = logging.getLogger(__name__)
 
@@ -298,7 +298,7 @@ async def show_sql_callback(
     callback_data = json.loads(query.data)
     ray_id = callback_data["ray_id"]
 
-    brain_response_data = await internal_db.brain_response_repository.get(ray_id = ray_id)
+    brain_response_data = await a_exec_no_raise(internal_db.brain_response_repository.get_last_brain_sql(ray_id = ray_id))
     reply_markup = query.message.reply_markup
     keyboard_without_sql = []
     for button_row in reply_markup.inline_keyboard:
@@ -359,9 +359,7 @@ def __get_sql_script_button(answer: Answer) -> InlineKeyboardButton | None:
 
 async def __send_user_awaiting_for_answer_message(
         chat_id: int, exec_info_storage: ExecInfoStorage, context: ContextTypes.DEFAULT_TYPE):
-    seconds = None
-    if exec_info_storage:
-        seconds = exec_info_storage.average()
+    seconds = exec_info_storage.average() if exec_info_storage else None
     if seconds:
         await context.bot.send_message(
             chat_id,

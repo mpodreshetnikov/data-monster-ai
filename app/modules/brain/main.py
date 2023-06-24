@@ -42,15 +42,25 @@ from modules.brain.llm.prompts.clarifying_question_prompts import (
 )
 from modules.brain.llm.monitoring.callback import LogLLMRayCallbackHandler
 from modules.brain.llm.parsers.custom_output_parser import CustomAgentOutputParser
-from modules.brain.llm.parsers.custom_output_parser import LastPromptSaverCallbackHandler
+from modules.brain.llm.parsers.custom_output_parser import (
+    LastPromptSaverCallbackHandler,
+)
 from modules.common.errors import (
-    add_info_to_exception, AgentLimitExceededAnswerException, SQLTimeoutAnswerException,
-    CreatedNotWorkingSQLAnswerException, NoDataReturnedFromDBAnswerException, LLMContextExceededAnswerException)
+    add_info_to_exception,
+    AgentLimitExceededAnswerException,
+    SQLTimeoutAnswerException,
+    CreatedNotWorkingSQLAnswerException,
+    NoDataReturnedFromDBAnswerException,
+    LLMContextExceededAnswerException,
+)
 from modules.common.sql_helpers import update_limit
 
 from modules.data_access.main import InternalDB
-from modules.data_access.models.brain_response_data import BrainResponseType
-
+from modules.data_access.models.brain_response_data import (
+    BrainResponseType,
+    BrainResponseData,
+)
+from modules.common.helpers import a_exec_no_raise
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +112,7 @@ class Brain:
         verbose: bool = False,
         prompt_log_path: str | None = None,
         internal_db: InternalDB | None = None,
-        clarifying_question_llm:  BaseLanguageModel | None = None,
+        clarifying_question_llm: BaseLanguageModel | None = None,
     ) -> None:
         self.db = db
         self._verbose = verbose
@@ -120,7 +130,9 @@ class Brain:
             db_hints_doc_path, db_comments_override_path, sql_query_examples_path
         )
 
-    async def answer(self, question: str, ray_id: str, mode: BrainMode = BrainMode.DEFAULT) -> Answer:
+    async def answer(
+        self, question: str, ray_id: str, mode: BrainMode = BrainMode.DEFAULT
+    ) -> Answer:
         ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path, ray_id=ray_id)
         answer = Answer(question, ray_id)
 
@@ -129,24 +141,63 @@ class Brain:
             if mode == BrainMode.SHORT
             else Constants.DEFAULT_SQL_AGENT_ITERATIONS
         )
-        answer.answer_text = await self.__provide_text_answer(question, ray_logger, ray_id, sql_agent_iter_limit)
+        brain_response = await a_exec_no_raise(
+            self.internal_db.brain_response_repository.add(
+                ray_id=answer.ray_id,
+                question=answer.question,
+                type=BrainResponseType.SQL,
+            )
+        )
+
+        answer.answer_text = await self.__provide_text_answer(
+            question, ray_logger, ray_id, sql_agent_iter_limit
+        )
 
         answer.sql_script = ray_logger.get_sql_script()
 
+        brain_response.answer = answer.answer_text
+        brain_response.sql_script = answer.sql_script
+
+        await a_exec_no_raise(
+            self.internal_db.brain_response_repository.update(brain_response)
+        )
+
         try:
+            brain_response_chart = await a_exec_no_raise(
+                self.internal_db.brain_response_repository.add(
+                    ray_id=answer.ray_id,
+                    question=answer.question,
+                    type=BrainResponseType.CHART,
+                )
+            )
             answer.chart_params = await self.__provide_chart_params(
                 answer, ray_logger=ray_logger
             )
             if answer.chart_params:
+                brain_response_chart.answer = repr(answer.chart_params)
+                await a_exec_no_raise(
+                    self.internal_db.brain_response_repository.update(
+                        brain_response_chart
+                    )
+                )
                 answer.chart_data = await self.__get_chart_data(answer)
         except Exception:
             answer.chart_params = None
 
-        await self.__save_brain_response(answer)
         return answer
 
-    async def make_clarifying_question(self, context: str, ray_id: str) -> ClarifyingQuestionParams | None:
+    async def make_clarifying_question(
+        self, context: str, ray_id: str
+    ) -> ClarifyingQuestionParams | None:
         ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path, ray_id=ray_id)
+        answer = Answer(context, ray_id)
+        brain_response_clarifying_question = await a_exec_no_raise(
+            self.internal_db.brain_response_repository.add(
+                ray_id=answer.ray_id,
+                question=answer.question,
+                type=BrainResponseType.CLARIFYING_QUESTION,
+            )
+        )
 
         chain = LLMChain(
             llm=self.clarifying_question_llm or self.default_llm,
@@ -155,35 +206,43 @@ class Brain:
         )
         with get_openai_callback() as openai_cb:
             try:
-                result: ClarifyingQuestionParams | None = await chain.apredict_and_parse(
-                    callbacks=[ray_logger] if ray_logger else [],
-                    context=context,
-                ) # type: ignore
+                result: ClarifyingQuestionParams | None = (
+                    await chain.apredict_and_parse(
+                        callbacks=[ray_logger] if ray_logger else [],
+                        context=context,
+                    )
+                )  # type: ignore
             finally:
                 logger.info(openai_cb)
 
         if not result:
             return None
 
-        answer = Answer(context, ray_id, result.clarifying_question)
-        await self.__save_brain_response(answer, BrainResponseType.CLARIFYING_QUESTION)
+        if result.action.name == "Restart":
+            answer.answer_text = result.action.name
+        elif result.action.name == "Clarify":
+            answer.answer_text = result.clarifying_question
+
+        brain_response_clarifying_question.answer = answer.answer_text
+        await a_exec_no_raise(
+            self.internal_db.brain_response_repository.update(
+                brain_response_clarifying_question
+            )
+        )
 
         return result
 
-    async def __save_brain_response(self, answer: Answer, type: BrainResponseType = BrainResponseType.SQL) -> None:
-        try:
-            await self.internal_db.brain_response_repository.add(
-                answer.ray_id, answer.question, answer.answer_text or "", answer.sql_script, type
-            )
-        except Exception as e:
-            logger.error(e, exc_info=True)
-            
     async def __provide_text_answer(
-        self, question: str, ray_logger: LogLLMRayCallbackHandler, ray_id: str, sql_agent_iter_limit: int = 5
+        self,
+        question: str,
+        ray_logger: LogLLMRayCallbackHandler,
+        ray_id: str,
+        sql_agent_iter_limit: int = 5,
     ) -> str:
         last_prompt_saver = LastPromptSaverCallbackHandler()
-        sql_agent_chain =  await self.__build_sql_agent_chain(
-            question, last_prompt_saver, agent_iter_limit=sql_agent_iter_limit)
+        sql_agent_chain = await self.__build_sql_agent_chain(
+            question, last_prompt_saver, agent_iter_limit=sql_agent_iter_limit
+        )
         lang_translator_chain = self.__build_lang_translator_chain()
 
         overall_chain = SimpleSequentialChain(
@@ -195,7 +254,12 @@ class Brain:
             try:
                 response = await overall_chain.arun(
                     question,
-                    callbacks=[last_prompt_saver, ray_logger, *self._inheritable_llm_callbacks],)
+                    callbacks=[
+                        last_prompt_saver,
+                        ray_logger,
+                        *self._inheritable_llm_callbacks,
+                    ],
+                )
             except OutputParserException as e:
                 logger.error("Parser cannot parse AI answer", exc_info=True)
                 e = add_info_to_exception(e, "ray_id", ray_id)
@@ -209,7 +273,7 @@ class Brain:
                 raise e
             finally:
                 logger.info(openai_cb)
-        
+
         # do checks even the answer is got
         sql = ray_logger.get_sql_script()
         if sql:
@@ -223,25 +287,28 @@ class Brain:
             except (OperationalError, asyncio.TimeoutError):
                 if ray_logger.was_sql_timeout_error:
                     e = SQLTimeoutAnswerException()
-                    e = add_info_to_exception(
-                        e, "ray_id", ray_id)
+                    e = add_info_to_exception(e, "ray_id", ray_id)
                     raise e
             except Exception as e:
-                logger.error(f"Error while executing SQL, ray_id: {ray_id}", exc_info=True)
+                logger.error(
+                    f"Error while executing SQL, ray_id: {ray_id}", exc_info=True
+                )
                 e = CreatedNotWorkingSQLAnswerException()
-                e = add_info_to_exception(
-                    e, "ray_id", ray_id)
+                e = add_info_to_exception(e, "ray_id", ray_id)
                 raise e
             if not data or (
                 # test if data contains only one row with one value and it is False (0, no data, empty string)
-                len(data) == 1 and len(data[0]) == 1 and not bool(list(data[0].values())[0])
+                len(data) == 1
+                and len(data[0]) == 1
+                and not bool(list(data[0].values())[0])
             ):
                 e = NoDataReturnedFromDBAnswerException()
-                e = add_info_to_exception(
-                    e, "ray_id", ray_id)
+                e = add_info_to_exception(e, "ray_id", ray_id)
                 raise e
-
-        return response
+            return response
+        e = CreatedNotWorkingSQLAnswerException()
+        e = add_info_to_exception(e, "ray_id", ray_id)
+        raise e
 
     def __build_sql_llm_toolkit(
         self,
@@ -294,7 +361,6 @@ class Brain:
 
         return agent_executor
 
-
     def __build_sql_agent_executor(
         self,
         llm: BaseLanguageModel,
@@ -315,7 +381,9 @@ class Brain:
         Rewrite original building method to raise exception when exec limit is exceeded.
         """
         tools = self._default_sql_llm_toolkit.get_tools()
-        prefix = prefix.format(dialect=self._default_sql_llm_toolkit.dialect, top_k=top_k)
+        prefix = prefix.format(
+            dialect=self._default_sql_llm_toolkit.dialect, top_k=top_k
+        )
         prompt = ZeroShotAgent.create_prompt(
             tools,
             prefix=prefix,
@@ -335,12 +403,17 @@ class Brain:
                 self,
                 early_stopping_method: str,
                 intermediate_steps: list[tuple[AgentAction, str]],
-                **kwargs: Any
+                **kwargs: Any,
             ) -> AgentFinish:
                 inputs = self.get_full_inputs(intermediate_steps, **kwargs)
-                agent_work_text = inputs.get("agent_scratchpad", "")
+                question = inputs.get("input", "")
+                agent_work = inputs.get("agent_scratchpad", "")
+                agent_work_text = f"Question:{question}\n{agent_work}"
                 raise AgentLimitExceededAnswerException(agent_work_text=agent_work_text)
-        agent = ZeroShotAgentRaising(llm_chain=llm_chain, allowed_tools=tool_names, **kwargs)
+
+        agent = ZeroShotAgentRaising(
+            llm_chain=llm_chain, allowed_tools=tool_names, **kwargs
+        )
         return AgentExecutor.from_agent_and_tools(
             agent=agent,
             tools=tools,
@@ -352,7 +425,9 @@ class Brain:
             **(agent_executor_kwargs or {}),
         )
 
-    def __build_lang_translator_chain(self, llm: BaseLanguageModel | None = None) -> Chain:
+    def __build_lang_translator_chain(
+        self, llm: BaseLanguageModel | None = None
+    ) -> Chain:
         translator_chain = LLMChain(
             llm=llm or self.default_llm, prompt=TRANSLATOR_PROMPT
         )
