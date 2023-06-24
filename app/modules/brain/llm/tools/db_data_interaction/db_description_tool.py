@@ -64,7 +64,8 @@ class ListSQLDatabaseWithCommentsTool(ListSQLDatabaseTool):
 
         return value
 
-    def __get_override_table_comment(self, table_name):
+    def __get_override_table_comment(self, table_name: str):
+        table_name = table_name.split(".")[-1]
         if not self.db_comments_override:
             return None
         for table in self.db_comments_override:
@@ -166,6 +167,7 @@ class InfoSQLDatabaseWithCommentsTool(InfoSQLDatabaseTool):
         return "\n\n".join(tables)
 
     def __get_override_column_comment(self, table_name, column_name):
+        table_name = table_name.split(".")[-1]
         if not self.db_comments_override:
             return None
         for table in self.db_comments_override:
