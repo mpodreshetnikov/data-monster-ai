@@ -60,6 +60,7 @@ from modules.data_access.models.brain_response_data import (
     BrainResponseType,
     BrainResponseData,
 )
+
 from modules.common.helpers import a_exec_no_raise
 
 logger = logging.getLogger(__name__)
@@ -218,11 +219,10 @@ class Brain:
         if not result:
             return None
 
-        if result.action.name == "Restart":
+        if result.action == ClarifyingQuestionParams.Action.Restart:
             answer.answer_text = result.action.name
-        elif result.action.name == "Clarify":
+        if result.action == ClarifyingQuestionParams.Action.Clarify:
             answer.answer_text = result.clarifying_question
-
         brain_response_clarifying_question.answer = answer.answer_text
         await a_exec_no_raise(
             self.internal_db.brain_response_repository.update(
@@ -262,14 +262,11 @@ class Brain:
                 )
             except OutputParserException as e:
                 logger.error("Parser cannot parse AI answer", exc_info=True)
-                e = add_info_to_exception(e, "ray_id", ray_id)
                 raise e
             except InvalidRequestError as e:
                 logger.error("Error while asking OpenAI", exc_info=True)
-                e = add_info_to_exception(e, "ray_id", ray_id)
                 raise e
             except Exception as e:
-                e = add_info_to_exception(e, "ray_id", ray_id)
                 raise e
             finally:
                 logger.info(openai_cb)
@@ -287,14 +284,12 @@ class Brain:
             except (OperationalError, asyncio.TimeoutError):
                 if ray_logger.was_sql_timeout_error:
                     e = SQLTimeoutAnswerException()
-                    e = add_info_to_exception(e, "ray_id", ray_id)
                     raise e
             except Exception as e:
                 logger.error(
                     f"Error while executing SQL, ray_id: {ray_id}", exc_info=True
                 )
                 e = CreatedNotWorkingSQLAnswerException()
-                e = add_info_to_exception(e, "ray_id", ray_id)
                 raise e
             if not data or (
                 # test if data contains only one row with one value and it is False (0, no data, empty string)
@@ -303,11 +298,9 @@ class Brain:
                 and not bool(list(data[0].values())[0])
             ):
                 e = NoDataReturnedFromDBAnswerException()
-                e = add_info_to_exception(e, "ray_id", ray_id)
                 raise e
             return response
         e = CreatedNotWorkingSQLAnswerException()
-        e = add_info_to_exception(e, "ray_id", ray_id)
         raise e
 
     def __build_sql_llm_toolkit(
