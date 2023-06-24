@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def add_handlers(application: Application):
-    application.add_handler(CommandHandler("start", __chat_started_handler__))
+    application.add_handler(CommandHandler("start", __chat_started_handler__, block=False))
 
 
 @a_only_allowed_users

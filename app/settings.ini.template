@@ -19,6 +19,7 @@ password = qwerty12345
 host = 1.1.1.1
 port = 1111
 database = dwh_uas
+timeout = 60
 
 [client_db]
 sync_drivername = postgresql
@@ -30,6 +31,7 @@ port = 1111
 database = dwh_uas
 schema = dwh_uas
 tables_to_use = shema1.table1,shema1.table2,shema2.table3,shema2.table4,shema3.table5
+timeout = 60
 
 [s3]
 endpoint_url = https://mpodreshetnikov.ru/s3
@@ -38,7 +40,8 @@ secret_key = BBBBBBBBBBBBBBBBBBB
 
 [openai]
 api_key = sk-qwerty12345
-temperature = 0.7
+temperature_low = 0.3
+temperature_high = 0.6
 
 [hints]
 db_hints_doc_path = v2/test_scripts/db_hints.txt

@@ -1,6 +1,8 @@
+from enum import Enum
 import logging
 from dataclasses import dataclass
 from typing import Any
+import asyncio
 
 from langchain import LLMChain, SQLDatabase
 from langchain.base_language import BaseLanguageModel
@@ -34,16 +36,32 @@ from modules.brain.llm.prompts.chart_prompts import (
     ChartParams,
     build_data_example_for_prompt,
 )
+from modules.brain.llm.prompts.clarifying_question_prompts import (
+    CLARIFYING_QUESTION_PROMPT,
+    ClarifyingQuestionParams,
+)
 from modules.brain.llm.monitoring.callback import LogLLMRayCallbackHandler
 from modules.brain.llm.parsers.custom_output_parser import CustomAgentOutputParser
-from modules.brain.llm.parsers.custom_output_parser import LastPromptSaverCallbackHandler
+from modules.brain.llm.parsers.custom_output_parser import (
+    LastPromptSaverCallbackHandler,
+)
 from modules.common.errors import (
-    add_info_to_exception, AgentLimitExceededAnswerException, SQLTimeoutAnswerException,
-    CreatedNotWorkingSQLAnswerException, NoDataReturnedFromDBAnswerException, LLMContextExceededAnswerException)
+    add_info_to_exception,
+    AgentLimitExceededAnswerException,
+    SQLTimeoutAnswerException,
+    CreatedNotWorkingSQLAnswerException,
+    NoDataReturnedFromDBAnswerException,
+    LLMContextExceededAnswerException,
+)
 from modules.common.sql_helpers import update_limit
 
 from modules.data_access.main import InternalDB
+from modules.data_access.models.brain_response_data import (
+    BrainResponseType,
+    BrainResponseData,
+)
 
+from modules.common.helpers import a_exec_no_raise
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +76,20 @@ class Answer:
     chart_data: list[dict] | None = None
 
 
+class BrainMode(Enum):
+    SHORT = 1
+    """Minimum agent iterations"""
+    DEFAULT = 2
+    """Default agent iterations"""
+
+
+class Constants:
+    MIN_SQL_AGENT_ITERATIONS = 2
+    """By the statistics, bot answers correctly instantly in 85% cases (for good questions)"""
+    DEFAULT_SQL_AGENT_ITERATIONS = 4
+    """By the statistics, bot answers correctly in 3-4 iterations in 100% cases (for good questions)"""
+
+
 class Brain:
     db: SQLDatabase
     default_llm: BaseLanguageModel
@@ -68,7 +100,6 @@ class Brain:
     _verbose: bool = False
     _default_sql_llm_toolkit: DbDataInteractionToolkit
     _sql_query_hints_limit: int = 0
-    _sql_agent_max_iterations: int = 5
 
     def __init__(
         self,
@@ -79,15 +110,14 @@ class Brain:
         db_comments_override_path: str | None = None,
         sql_query_examples_path: str | None = None,
         sql_query_hints_limit: int = 0,
-        sql_agent_max_iterations: int = 5,
         verbose: bool = False,
         prompt_log_path: str | None = None,
         internal_db: InternalDB | None = None,
+        clarifying_question_llm: BaseLanguageModel | None = None,
     ) -> None:
         self.db = db
         self._verbose = verbose
         self._sql_query_hints_limit = sql_query_hints_limit
-        self._sql_agent_max_iterations = sql_agent_max_iterations
         self._prompt_log_path = prompt_log_path
         self.internal_db = internal_db
         if not embeddings:
@@ -96,41 +126,123 @@ class Brain:
         if not llm:
             logger.warning("No llm provided, using default ChatOpenAI")
         self.default_llm = llm or ChatOpenAI(verbose=self._verbose)
+        self.clarifying_question_llm = clarifying_question_llm
         self._default_sql_llm_toolkit = self.__build_sql_llm_toolkit(
             db_hints_doc_path, db_comments_override_path, sql_query_examples_path
         )
 
-    async def answer(self, question: str, ray_id: str) -> Answer:
+    async def answer(
+        self, question: str, ray_id: str, mode: BrainMode = BrainMode.DEFAULT
+    ) -> Answer:
         ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path, ray_id=ray_id)
         answer = Answer(question, ray_id)
-        answer.answer_text = await self.__provide_text_answer(question, ray_logger, ray_id)
+
+        sql_agent_iter_limit = (
+            Constants.MIN_SQL_AGENT_ITERATIONS
+            if mode == BrainMode.SHORT
+            else Constants.DEFAULT_SQL_AGENT_ITERATIONS
+        )
+        brain_response = await a_exec_no_raise(
+            self.internal_db.brain_response_repository.add(
+                ray_id=answer.ray_id,
+                question=answer.question,
+                type=BrainResponseType.SQL,
+            )
+        )
+
+        answer.answer_text = await self.__provide_text_answer(
+            question, ray_logger, ray_id, sql_agent_iter_limit
+        )
+
         answer.sql_script = ray_logger.get_sql_script()
 
+        brain_response.answer = answer.answer_text
+        brain_response.sql_script = answer.sql_script
+
+        await a_exec_no_raise(
+            self.internal_db.brain_response_repository.update(brain_response)
+        )
+
         try:
+            brain_response_chart = await a_exec_no_raise(
+                self.internal_db.brain_response_repository.add(
+                    ray_id=answer.ray_id,
+                    question=answer.question,
+                    type=BrainResponseType.CHART,
+                )
+            )
             answer.chart_params = await self.__provide_chart_params(
                 answer, ray_logger=ray_logger
             )
             if answer.chart_params:
+                brain_response_chart.answer = repr(answer.chart_params)
+                await a_exec_no_raise(
+                    self.internal_db.brain_response_repository.update(
+                        brain_response_chart
+                    )
+                )
                 answer.chart_data = await self.__get_chart_data(answer)
         except Exception:
             answer.chart_params = None
 
-        await self.__save_brain_response(answer)
         return answer
 
-    async def __save_brain_response(self, answer: Answer) -> None:
-        try:
-            await self.internal_db.brain_response_repository.add(
-                answer.ray_id, answer.question, answer.sql_script, answer.answer_text
+    async def make_clarifying_question(
+        self, context: str, ray_id: str
+    ) -> ClarifyingQuestionParams | None:
+        ray_logger = LogLLMRayCallbackHandler(self._prompt_log_path, ray_id=ray_id)
+        answer = Answer(context, ray_id)
+        brain_response_clarifying_question = await a_exec_no_raise(
+            self.internal_db.brain_response_repository.add(
+                ray_id=answer.ray_id,
+                question=answer.question,
+                type=BrainResponseType.CLARIFYING_QUESTION,
             )
-        except Exception as e:
-            logger.error(e, exc_info=True)
-            
+        )
+
+        chain = LLMChain(
+            llm=self.clarifying_question_llm or self.default_llm,
+            prompt=CLARIFYING_QUESTION_PROMPT,
+            verbose=self._verbose,
+        )
+        with get_openai_callback() as openai_cb:
+            try:
+                result: ClarifyingQuestionParams | None = (
+                    await chain.apredict_and_parse(
+                        callbacks=[ray_logger] if ray_logger else [],
+                        context=context,
+                    )
+                )  # type: ignore
+            finally:
+                logger.info(openai_cb)
+
+        if not result:
+            return None
+
+        if result.action == ClarifyingQuestionParams.Action.Restart:
+            answer.answer_text = result.action.name
+        if result.action == ClarifyingQuestionParams.Action.Clarify:
+            answer.answer_text = result.clarifying_question
+        brain_response_clarifying_question.answer = answer.answer_text
+        await a_exec_no_raise(
+            self.internal_db.brain_response_repository.update(
+                brain_response_clarifying_question
+            )
+        )
+
+        return result
+
     async def __provide_text_answer(
-        self, question: str, ray_logger: LogLLMRayCallbackHandler, ray_id:str
+        self,
+        question: str,
+        ray_logger: LogLLMRayCallbackHandler,
+        ray_id: str,
+        sql_agent_iter_limit: int = 5,
     ) -> str:
         last_prompt_saver = LastPromptSaverCallbackHandler()
-        sql_agent_chain =  await self.__build_sql_agent_chain(question, last_prompt_saver)
+        sql_agent_chain = await self.__build_sql_agent_chain(
+            question, last_prompt_saver, agent_iter_limit=sql_agent_iter_limit
+        )
         lang_translator_chain = self.__build_lang_translator_chain()
 
         overall_chain = SimpleSequentialChain(
@@ -142,21 +254,23 @@ class Brain:
             try:
                 response = await overall_chain.arun(
                     question,
-                    callbacks=[last_prompt_saver, ray_logger, *self._inheritable_llm_callbacks],)
+                    callbacks=[
+                        last_prompt_saver,
+                        ray_logger,
+                        *self._inheritable_llm_callbacks,
+                    ],
+                )
             except OutputParserException as e:
                 logger.error("Parser cannot parse AI answer", exc_info=True)
-                e = add_info_to_exception(e, "ray_id", ray_id)
                 raise e
             except InvalidRequestError as e:
                 logger.error("Error while asking OpenAI", exc_info=True)
-                e = add_info_to_exception(e, "ray_id", ray_id)
                 raise e
             except Exception as e:
-                e = add_info_to_exception(e, "ray_id", ray_id)
                 raise e
             finally:
                 logger.info(openai_cb)
-        
+
         # do checks even the answer is got
         sql = ray_logger.get_sql_script()
         if sql:
@@ -167,28 +281,27 @@ class Brain:
                     rows = result.fetchall()
                     columns = result.keys()
                     data: list[dict] = [dict(zip(columns, row)) for row in rows]
-            except OperationalError:
+            except (OperationalError, asyncio.TimeoutError):
                 if ray_logger.was_sql_timeout_error:
                     e = SQLTimeoutAnswerException()
-                    e = add_info_to_exception(
-                        e, "ray_id", ray_id)
                     raise e
             except Exception as e:
-                logger.error(f"Error while executing SQL, ray_id: {ray_id}", exc_info=True)
+                logger.error(
+                    f"Error while executing SQL, ray_id: {ray_id}", exc_info=True
+                )
                 e = CreatedNotWorkingSQLAnswerException()
-                e = add_info_to_exception(
-                    e, "ray_id", ray_id)
                 raise e
             if not data or (
                 # test if data contains only one row with one value and it is False (0, no data, empty string)
-                len(data) == 1 and len(data[0]) == 1 and not bool(list(data[0].values())[0])
+                len(data) == 1
+                and len(data[0]) == 1
+                and not bool(list(data[0].values())[0])
             ):
                 e = NoDataReturnedFromDBAnswerException()
-                e = add_info_to_exception(
-                    e, "ray_id", ray_id)
                 raise e
-
-        return response
+            return response
+        e = CreatedNotWorkingSQLAnswerException()
+        raise e
 
     def __build_sql_llm_toolkit(
         self,
@@ -215,7 +328,8 @@ class Brain:
         self,
         question: str,
         last_prompt_saver: LastPromptSaverCallbackHandler,
-        llm: BaseLanguageModel = None,
+        llm: BaseLanguageModel | None = None,
+        agent_iter_limit: int = 5,
     ) -> Chain:
         hints_str = await get_formatted_hints(
             self._default_sql_llm_toolkit,
@@ -235,10 +349,10 @@ class Brain:
             llm=llm or self.default_llm,
             suffix=agent_suffix,
             output_parser=output_parser,
+            agent_iter_limit=agent_iter_limit,
         )
 
         return agent_executor
-
 
     def __build_sql_agent_executor(
         self,
@@ -252,6 +366,7 @@ class Brain:
         max_execution_time: float | None = None,
         early_stopping_method: str = "force",
         agent_executor_kwargs: dict[str, Any] | None = None,
+        agent_iter_limit: int = 5,
         **kwargs,
     ):
         """
@@ -259,7 +374,9 @@ class Brain:
         Rewrite original building method to raise exception when exec limit is exceeded.
         """
         tools = self._default_sql_llm_toolkit.get_tools()
-        prefix = prefix.format(dialect=self._default_sql_llm_toolkit.dialect, top_k=top_k)
+        prefix = prefix.format(
+            dialect=self._default_sql_llm_toolkit.dialect, top_k=top_k
+        )
         prompt = ZeroShotAgent.create_prompt(
             tools,
             prefix=prefix,
@@ -276,24 +393,34 @@ class Brain:
 
         class ZeroShotAgentRaising(ZeroShotAgent):
             def return_stopped_response(
-                    self,
-                    early_stopping_method: str,
-                    intermediate_steps: list[tuple[AgentAction, str]],
-                    **kwargs: Any) -> AgentFinish:
-                raise AgentLimitExceededAnswerException()
-        agent = ZeroShotAgentRaising(llm_chain=llm_chain, allowed_tools=tool_names, **kwargs)
+                self,
+                early_stopping_method: str,
+                intermediate_steps: list[tuple[AgentAction, str]],
+                **kwargs: Any,
+            ) -> AgentFinish:
+                inputs = self.get_full_inputs(intermediate_steps, **kwargs)
+                question = inputs.get("input", "")
+                agent_work = inputs.get("agent_scratchpad", "")
+                agent_work_text = f"Question:{question}\n{agent_work}"
+                raise AgentLimitExceededAnswerException(agent_work_text=agent_work_text)
+
+        agent = ZeroShotAgentRaising(
+            llm_chain=llm_chain, allowed_tools=tool_names, **kwargs
+        )
         return AgentExecutor.from_agent_and_tools(
             agent=agent,
             tools=tools,
             callback_manager=callback_manager,
             verbose=self._verbose,
-            max_iterations=self._sql_agent_max_iterations,
+            max_iterations=agent_iter_limit,
             max_execution_time=max_execution_time,
             early_stopping_method=early_stopping_method,
             **(agent_executor_kwargs or {}),
         )
 
-    def __build_lang_translator_chain(self, llm: BaseLanguageModel = None) -> Chain:
+    def __build_lang_translator_chain(
+        self, llm: BaseLanguageModel | None = None
+    ) -> Chain:
         translator_chain = LLMChain(
             llm=llm or self.default_llm, prompt=TRANSLATOR_PROMPT
         )
