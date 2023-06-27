@@ -90,10 +90,10 @@ tables:
       - name: cashbox_id
         comment: Id кассы
       - name: owner_id
-        comment: Id аптеки, внешний ключ к таблице uas_data_cnt_company
+        comment: Id аптеки, внешний ключ к таблице uas_data_cnt_company_todel
       - name: owner_key
         comment: Ключ аптеки, которой принадлежит данная сессия
-  - name: uas_data_cnt_company
+  - name: uas_data_cnt_company_todel
     comment: аптеки/филиалы
   - name: uas_data_med_nomenclature_todel
     comment: Таблица содержит информацию о медицинских продуктах, таких как лекарства и медицинские изделия. Каждая строка в таблице представляет собой отдельный элемент номенклатуры.
@@ -128,7 +128,7 @@ tables:
         comment: Дата создания
       - name: pz_update
         comment: Флаг, указывающий, требуется ли обновление
-  - name: uas_data_user
+  - name: uas_data_user_todel
     comment: Эта таблица содержит информацию об каждом сотруднике/продавце
     columns:
       - name: is_invalid
