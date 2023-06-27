@@ -49,8 +49,6 @@ async def __error_handler__(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
     logger.error(error, exc_info=True)
 
-    ray_id = get_info_from_exception(error, "ray_id")
-
     if isinstance(error, UserNotAllowedException):
         method_name = error.method_name or "app"
         logger.info(f"User {username}:{user_id} was not allowed to the {method_name}")
