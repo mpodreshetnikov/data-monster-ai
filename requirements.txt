@@ -1,4 +1,4 @@
-langchain==0.0.181
+langchain==0.0.221
 openai==0.27.7
 pydantic==1.10.8
 python-telegram-bot==20.3
