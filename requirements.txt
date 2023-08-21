@@ -3,7 +3,7 @@ openai==0.27.7
 pydantic==1.10.8
 python-telegram-bot==20.3
 PyYAML==6.0
-SQLAlchemy==2.0.16
+SQLAlchemy==2.0.20
 psycopg2-binary==2.9.6
 chromadb==0.3.25
 tiktoken==0.4.0
